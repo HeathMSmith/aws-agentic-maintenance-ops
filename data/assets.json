@@ -1,0 +1,15 @@
+{
+  "assets": [
+    {
+      "asset_id": "CONV-MTR-042",
+      "name": "Packaging Conveyor Motor 042",
+      "asset_type": "electric_motor",
+      "location": "Packaging Line 2",
+      "criticality": "high",
+      "operational_status": "running",
+      "manufacturer": "Simulated Industrial Motors",
+      "rated_power_kw": 15,
+      "maintenance_interval_days": 90
+    }
+  ]
+}
