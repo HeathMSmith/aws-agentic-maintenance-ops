@@ -1,7 +1,7 @@
 import pytest
 
 from simulation.schedule_analysis import get_next_maintenance_window
-
+from simulation.schedule_analysis import get_maintenance_window_at
 
 INCIDENT_TIME = "2026-11-09T14:30:00Z"
 
@@ -120,3 +120,35 @@ def test_rejects_invalid_window_duration():
         match="maintenance window end must be after start",
     ):
         get_next_maintenance_window(schedule, INCIDENT_TIME)
+
+
+def test_maintenance_window_at_incident_time():
+    from agent.tools.production_schedule import get_production_schedule
+
+    schedule = get_production_schedule("CONV-MTR-042")["schedule"]
+
+    result = get_maintenance_window_at(
+        schedule,
+        "2026-11-09T14:30:00Z",
+    )
+
+    assert result["available"] is True
+    assert result["schedule_id"] == "MAINT-WINDOW-0001"
+    assert result["hours_until_start"] == 7.5
+    assert result["remaining_duration_hours"] == 4.0
+
+
+def test_maintenance_window_at_after_expiration():
+    from agent.tools.production_schedule import get_production_schedule
+
+    schedule = get_production_schedule("CONV-MTR-042")["schedule"]
+
+    result = get_maintenance_window_at(
+        schedule,
+        "2026-11-10T18:00:00Z",
+    )
+
+    assert result == {
+        "available": False,
+        "reason": "No upcoming maintenance window found",
+    }
