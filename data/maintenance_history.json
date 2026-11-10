@@ -1,0 +1,24 @@
+{
+  "maintenance_records": [
+    {
+      "record_id": "MAINT-0001",
+      "asset_id": "CONV-MTR-042",
+      "date": "2026-05-14",
+      "maintenance_type": "corrective",
+      "issue": "Elevated vibration associated with suspected bearing wear.",
+      "action_taken": "Inspected motor bearings and replaced drive-end bearing.",
+      "outcome": "Vibration returned to expected operating range.",
+      "downtime_hours": 3.5
+    },
+    {
+      "record_id": "MAINT-0002",
+      "asset_id": "CONV-MTR-042",
+      "date": "2026-08-12",
+      "maintenance_type": "preventive",
+      "issue": "Scheduled preventive maintenance inspection.",
+      "action_taken": "Inspected lubrication, mounting hardware, and motor alignment.",
+      "outcome": "No significant abnormalities identified.",
+      "downtime_hours": 1.0
+    }
+  ]
+}
