@@ -156,3 +156,37 @@ def test_policy_rejects_mismatched_maintenance_record(investigation):
         "decision": "rejected",
         "reason": "maintenance history contains mismatched asset records",
     }
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("hours_until_start", 1.0),
+        ("remaining_duration_hours", 2.0),
+        ("schedule_id", "WRONG-WINDOW"),
+    ],
+)
+def test_policy_rejects_inconsistent_maintenance_window(investigation, field, value):
+    investigation["maintenance_window"][field] = value
+
+    result = evaluate_action_with_context(
+        "create_maintenance_work_order",
+        investigation,
+    )
+
+    assert result == {
+        "decision": "rejected",
+        "reason": "maintenance window does not match production schedule",
+    }
+
+
+def test_policy_rejects_invalid_schedule_timestamp(investigation):
+    investigation["production_schedule"]["schedule"][1]["end"] = "invalid-timestamp"
+
+    result = evaluate_action_with_context(
+        "create_maintenance_work_order",
+        investigation,
+    )
+
+    assert result["decision"] == "rejected"
+    assert result["reason"].startswith("invalid maintenance window evidence:")

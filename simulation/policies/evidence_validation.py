@@ -1,3 +1,5 @@
+from simulation.policies.window_validation import validate_maintenance_window
+
 def validate_investigation_evidence(investigation: dict) -> dict:
     """Validate required evidence and asset relationships."""
 
@@ -69,5 +71,10 @@ def validate_investigation_evidence(investigation: dict) -> dict:
             "valid": False,
             "reason": "maintenance history contains mismatched asset records",
         }
+
+    window_validation = validate_maintenance_window(investigation)
+
+    if not window_validation["valid"]:
+        return window_validation
 
     return {"valid": True}
