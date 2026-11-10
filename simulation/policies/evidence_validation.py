@@ -1,5 +1,6 @@
 from simulation.policies.window_validation import validate_maintenance_window
 
+
 def validate_investigation_evidence(investigation: dict) -> dict:
     """Validate required evidence and asset relationships."""
 
@@ -62,9 +63,20 @@ def validate_investigation_evidence(investigation: dict) -> dict:
             "reason": "invalid maintenance history records",
         }
 
+    record_count = history.get("record_count")
+
+    if (
+        type(record_count) is not int
+        or record_count < 0
+        or record_count != len(records)
+    ):
+        return {
+            "valid": False,
+            "reason": "maintenance history record count mismatch",
+        }
+
     if any(
-        not isinstance(record, dict)
-        or record.get("asset_id") != asset_id
+        not isinstance(record, dict) or record.get("asset_id") != asset_id
         for record in records
     ):
         return {

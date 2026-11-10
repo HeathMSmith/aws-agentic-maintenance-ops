@@ -109,3 +109,36 @@ def test_accept_empty_maintenance_history(investigation):
     result = validate_investigation_evidence(investigation)
 
     assert result == {"valid": True}
+
+
+@pytest.mark.parametrize(
+    "record_count",
+    [
+        99,  # Doesn't match the records list
+        -1,  # Negative count
+        None,  # Missing/null count
+        "2",  # String instead of integer
+        True,  # Boolean instead of integer
+        2.0,  # Float instead of integer
+    ],
+)
+def test_reject_invalid_maintenance_record_count(investigation, record_count):
+    investigation["maintenance_history"]["record_count"] = record_count
+
+    result = validate_investigation_evidence(investigation)
+
+    assert result == {
+        "valid": False,
+        "reason": "maintenance history record count mismatch",
+    }
+
+
+def test_reject_missing_maintenance_record_count(investigation):
+    investigation["maintenance_history"].pop("record_count")
+
+    result = validate_investigation_evidence(investigation)
+
+    assert result == {
+        "valid": False,
+        "reason": "maintenance history record count mismatch",
+    }
