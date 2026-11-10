@@ -188,5 +188,55 @@ def test_policy_rejects_invalid_schedule_timestamp(investigation):
         investigation,
     )
 
-    assert result["decision"] == "rejected"
-    assert result["reason"].startswith("invalid maintenance window evidence:")
+    assert result == {
+        "decision": "rejected",
+        "reason": "invalid production schedule timestamp",
+    }
+
+
+def test_policy_rejects_overlapping_production_schedule(investigation):
+    investigation["production_schedule"]["schedule"][1][
+        "start"
+    ] = "2026-11-09T21:00:00Z"
+
+    result = evaluate_action_with_context(
+        "create_maintenance_work_order",
+        investigation,
+    )
+
+    assert result == {
+        "decision": "rejected",
+        "reason": "overlapping production schedule activities",
+    }
+
+
+def test_policy_rejects_invalid_production_duration(investigation):
+    schedule = investigation["production_schedule"]["schedule"]
+
+    schedule[0]["end"] = schedule[0]["start"]
+
+    result = evaluate_action_with_context(
+        "create_maintenance_work_order",
+        investigation,
+    )
+
+    assert result == {
+        "decision": "rejected",
+        "reason": "production schedule end must be after start",
+    }
+
+
+def test_policy_rejects_duplicate_schedule_ids(investigation):
+    schedule = investigation["production_schedule"]["schedule"]
+
+    schedule[1]["schedule_id"] = schedule[0]["schedule_id"]
+
+    result = evaluate_action_with_context(
+        "create_maintenance_work_order",
+        investigation,
+    )
+
+    assert result == {
+        "decision": "rejected",
+        "reason": "duplicate production schedule ID",
+    }

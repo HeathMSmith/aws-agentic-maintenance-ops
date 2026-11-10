@@ -1,4 +1,5 @@
 from simulation.policies.window_validation import validate_maintenance_window
+from simulation.policies.schedule_integrity import validate_schedule_integrity
 
 
 def validate_investigation_evidence(investigation: dict) -> dict:
@@ -83,6 +84,13 @@ def validate_investigation_evidence(investigation: dict) -> dict:
             "valid": False,
             "reason": "maintenance history contains mismatched asset records",
         }
+
+    schedule_validation = validate_schedule_integrity(
+        investigation["production_schedule"].get("schedule")
+    )
+
+    if not schedule_validation["valid"]:
+        return schedule_validation
 
     window_validation = validate_maintenance_window(investigation)
 
