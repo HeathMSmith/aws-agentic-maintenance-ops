@@ -1,0 +1,28 @@
+{
+  "production_lines": [
+    {
+      "line_id": "PKG-LINE-02",
+      "name": "Packaging Line 2",
+      "status": "active",
+      "assets": [
+        "CONV-MTR-042"
+      ],
+      "schedule": [
+        {
+          "schedule_id": "PROD-0001",
+          "start": "2026-11-09T06:00:00Z",
+          "end": "2026-11-09T22:00:00Z",
+          "activity": "scheduled_production",
+          "description": "Normal packaging operations."
+        },
+        {
+          "schedule_id": "MAINT-WINDOW-0001",
+          "start": "2026-11-09T22:00:00Z",
+          "end": "2026-11-10T02:00:00Z",
+          "activity": "planned_maintenance_window",
+          "description": "Scheduled maintenance availability."
+        }
+      ]
+    }
+  ]
+}
