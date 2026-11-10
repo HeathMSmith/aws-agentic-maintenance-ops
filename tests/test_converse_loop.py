@@ -173,3 +173,106 @@ def test_unexpected_stop_reason():
     }
 
     assert len(client.calls) == 1
+
+
+def test_complete_four_tool_investigation():
+    first_response = tool_request()
+
+    second_response = {
+        "stopReason": "tool_use",
+        "output": {
+            "message": {
+                "role": "assistant",
+                "content": [
+                    {
+                        "toolUse": {
+                            "toolUseId": "tool-002",
+                            "name": "get_asset_context",
+                            "input": {"asset_id": "CONV-MTR-042"},
+                        }
+                    },
+                    {
+                        "toolUse": {
+                            "toolUseId": "tool-003",
+                            "name": "get_maintenance_history",
+                            "input": {"asset_id": "CONV-MTR-042"},
+                        }
+                    },
+                    {
+                        "toolUse": {
+                            "toolUseId": "tool-004",
+                            "name": "get_production_schedule",
+                            "input": {"asset_id": "CONV-MTR-042"},
+                        }
+                    },
+                ],
+            }
+        },
+    }
+
+    client = FakeBedrockClient(
+        [
+            first_response,
+            second_response,
+            final_response(),
+        ]
+    )
+
+    result = run_conversation(
+        client,
+        "simulated-model",
+        "Investigate ALERT-0001 using all available evidence.",
+        max_model_calls=3,
+    )
+
+    assert result["status"] == "complete"
+    assert result["model_calls"] == 3
+    assert result["text"] == "ALERT-0001 requires investigation."
+
+    assert result["execution_trace"] == [
+        {
+            "model_call": 1,
+            "tool_name": "get_equipment_alert",
+            "status": "success",
+        },
+        {
+            "model_call": 2,
+            "tool_name": "get_asset_context",
+            "status": "success",
+        },
+        {
+            "model_call": 2,
+            "tool_name": "get_maintenance_history",
+            "status": "success",
+        },
+        {
+            "model_call": 2,
+            "tool_name": "get_production_schedule",
+            "status": "success",
+        },
+    ]
+
+    assert len(client.calls) == 3
+
+    # The third model request must contain all three tool results.
+    messages = client.calls[2]["messages"]
+    tool_results = messages[-1]["content"]
+
+    assert len(tool_results) == 3
+
+    assert [item["toolResult"]["toolUseId"] for item in tool_results] == [
+        "tool-002",
+        "tool-003",
+        "tool-004",
+    ]
+
+    assert all(item["toolResult"]["status"] == "success" for item in tool_results)
+
+    results_by_id = {
+        item["toolResult"]["toolUseId"]: item["toolResult"]["content"][0]["json"]
+        for item in tool_results
+    }
+
+    assert results_by_id["tool-002"]["asset_id"] == "CONV-MTR-042"
+    assert results_by_id["tool-003"]["record_count"] == 2
+    assert results_by_id["tool-004"]["line_id"] == "PKG-LINE-02"
