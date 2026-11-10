@@ -1,6 +1,7 @@
 from agent.tools.asset_context import get_asset_context
 from agent.tools.equipment_alert import get_equipment_alert
 from agent.tools.maintenance_history import get_maintenance_history
+from agent.tools.production_schedule import get_production_schedule
 
 
 def investigate_incident(alert_id: str) -> dict:
@@ -14,7 +15,8 @@ def investigate_incident(alert_id: str) -> dict:
             "error": alert["error"],
         }
 
-    asset = get_asset_context(alert["asset_id"])
+    asset_id = alert["asset_id"]
+    asset = get_asset_context(asset_id)
 
     if "error" in asset:
         return {
@@ -23,7 +25,7 @@ def investigate_incident(alert_id: str) -> dict:
             "error": asset["error"],
         }
 
-    maintenance_history = get_maintenance_history(alert["asset_id"])
+    maintenance_history = get_maintenance_history(asset_id)
 
     if "error" in maintenance_history:
         return {
@@ -32,10 +34,20 @@ def investigate_incident(alert_id: str) -> dict:
             "error": maintenance_history["error"],
         }
 
+    production_schedule = get_production_schedule(asset_id)
+
+    if "error" in production_schedule:
+        return {
+            "status": "failed",
+            "alert_id": alert_id,
+            "error": production_schedule["error"],
+        }
+
     return {
         "status": "investigated",
         "alert_id": alert_id,
         "alert": alert,
         "asset": asset,
         "maintenance_history": maintenance_history,
+        "production_schedule": production_schedule,
     }
