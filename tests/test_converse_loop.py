@@ -31,9 +31,7 @@ def final_response():
         "output": {
             "message": {
                 "role": "assistant",
-                "content": [
-                    {"text": "ALERT-0001 requires investigation."}
-                ],
+                "content": [{"text": "ALERT-0001 requires investigation."}],
             }
         },
     }
@@ -50,10 +48,12 @@ class FakeBedrockClient:
 
 
 def test_complete_tool_use_cycle():
-    client = FakeBedrockClient([
-        tool_request(),
-        final_response(),
-    ])
+    client = FakeBedrockClient(
+        [
+            tool_request(),
+            final_response(),
+        ]
+    )
 
     result = run_conversation(
         client,
@@ -65,6 +65,13 @@ def test_complete_tool_use_cycle():
         "status": "complete",
         "text": "ALERT-0001 requires investigation.",
         "model_calls": 2,
+        "execution_trace": [
+            {
+                "model_call": 1,
+                "tool_name": "get_equipment_alert",
+                "status": "success",
+            }
+        ],
     }
 
     assert len(client.calls) == 2
@@ -97,6 +104,13 @@ def test_model_call_limit():
     assert result == {
         "status": "limit_reached",
         "reason": "maximum model calls reached",
+        "execution_trace": [
+            {
+                "model_call": 1,
+                "tool_name": "get_equipment_alert",
+                "status": "success",
+            }
+        ],
     }
 
     assert len(client.calls) == 1
@@ -132,17 +146,19 @@ def test_reject_invalid_prompt(prompt):
 
 
 def test_unexpected_stop_reason():
-    client = FakeBedrockClient([
-        {
-            "stopReason": "max_tokens",
-            "output": {
-                "message": {
-                    "role": "assistant",
-                    "content": [],
-                }
-            },
-        }
-    ])
+    client = FakeBedrockClient(
+        [
+            {
+                "stopReason": "max_tokens",
+                "output": {
+                    "message": {
+                        "role": "assistant",
+                        "content": [],
+                    }
+                },
+            }
+        ]
+    )
 
     result = run_conversation(
         client,
@@ -153,6 +169,7 @@ def test_unexpected_stop_reason():
     assert result == {
         "status": "stopped",
         "reason": "max_tokens",
+        "execution_trace": [],
     }
 
     assert len(client.calls) == 1

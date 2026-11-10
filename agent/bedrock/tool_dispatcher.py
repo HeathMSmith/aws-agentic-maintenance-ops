@@ -1,6 +1,9 @@
 """Dispatch approved Bedrock tool requests to local Python functions."""
 
 from agent.tools.equipment_alert import get_equipment_alert
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def dispatch_tool(tool_name: str, tool_input: dict) -> dict:
@@ -23,4 +26,12 @@ def dispatch_tool(tool_name: str, tool_input: dict) -> dict:
             "message": "get_equipment_alert requires a non-empty alert_id string",
         }
 
-    return get_equipment_alert(tool_input["alert_id"])
+    result = get_equipment_alert(tool_input["alert_id"])
+
+    logger.info(
+        "Tool execution completed: tool=%s status=%s",
+        tool_name,
+        "error" if "error" in result else "success",
+    )
+
+    return result

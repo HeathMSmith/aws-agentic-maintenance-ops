@@ -25,7 +25,9 @@ def run_conversation(
         }
     ]
 
-    for _ in range(max_model_calls):
+    execution_trace = []
+
+    for model_call_number in range(1, max_model_calls + 1):
         response = client.converse(
             modelId=model_id,
             messages=messages,
@@ -39,15 +41,15 @@ def run_conversation(
             return {
                 "status": "complete",
                 "text": result["text"],
-                "model_calls": len(
-                    [message for message in messages if message["role"] == "assistant"]
-                ) + 1,
+                "model_calls": model_call_number,
+                "execution_trace": execution_trace,
             }
 
         if result["status"] == "unexpected_stop":
             return {
                 "status": "stopped",
                 "reason": result["reason"],
+                "execution_trace": execution_trace,
             }
 
         # Preserve the original assistant tool-use request.
@@ -55,15 +57,29 @@ def run_conversation(
 
         # Return all tool results together in one user message.
         tool_results = [
-            block
-            for message in result["messages"]
-            for block in message["content"]
+            block for message in result["messages"] for block in message["content"]
         ]
+
+        tool_requests = [
+            block["toolUse"]
+            for block in response["output"]["message"]["content"]
+            if "toolUse" in block
+        ]
+
+        for tool_request, tool_result in zip(tool_requests, tool_results):
+            execution_trace.append(
+                {
+                    "model_call": model_call_number,
+                    "tool_name": tool_request["name"],
+                    "status": tool_result["toolResult"]["status"],
+                }
+            )
 
         if not tool_results:
             return {
                 "status": "stopped",
                 "reason": "tool_use response contained no tool requests",
+                "execution_trace": execution_trace,
             }
 
         messages.append(
@@ -76,4 +92,5 @@ def run_conversation(
     return {
         "status": "limit_reached",
         "reason": "maximum model calls reached",
+        "execution_trace": execution_trace,
     }
