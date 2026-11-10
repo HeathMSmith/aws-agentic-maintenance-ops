@@ -146,3 +146,66 @@ def test_unexpected_stop_reason(stop_reason):
         "status": "unexpected_stop",
         "reason": stop_reason,
     }
+
+
+def test_execution_context_forwarded_to_tool_results(monkeypatch):
+    from agent.bedrock import response_handler
+
+    captured = {}
+
+    def fake_build_tool_result_message(
+        tool_use,
+        execution_context=None,
+    ):
+        captured["tool_use"] = tool_use
+        captured["execution_context"] = execution_context
+
+        return {
+            "role": "user",
+            "content": [
+                {
+                    "toolResult": {
+                        "toolUseId": tool_use["toolUseId"],
+                        "content": [{"json": {"status": "ok"}}],
+                        "status": "success",
+                    }
+                }
+            ],
+        }
+
+    monkeypatch.setattr(
+        response_handler,
+        "build_tool_result_message",
+        fake_build_tool_result_message,
+    )
+
+    context = {
+        "reference_timestamp": "2026-11-10T18:00:00Z",
+    }
+
+    tool_use = {
+        "toolUseId": "tool-001",
+        "name": "get_asset_context",
+        "input": {"asset_id": "CONV-MTR-042"},
+    }
+
+    response = {
+        "stopReason": "tool_use",
+        "output": {
+            "message": {
+                "role": "assistant",
+                "content": [{"toolUse": tool_use}],
+            }
+        },
+    }
+
+    result = response_handler.handle_converse_response(
+        response,
+        execution_context=context,
+    )
+
+    assert captured["tool_use"] == tool_use
+    assert captured["execution_context"] == context
+
+    assert result["status"] == "tool_results"
+    assert result["messages"][0]["content"][0]["toolResult"]["status"] == "success"

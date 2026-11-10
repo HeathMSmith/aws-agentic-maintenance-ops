@@ -9,6 +9,7 @@ def run_conversation(
     model_id: str,
     prompt: str,
     max_model_calls: int = 4,
+    execution_context: dict | None = None,
 ) -> dict:
     """Run a bounded model conversation with read-only tool execution."""
 
@@ -35,7 +36,10 @@ def run_conversation(
             inferenceConfig={"maxTokens": 2048},
         )
 
-        result = handle_converse_response(response)
+        result = handle_converse_response(
+            response,
+            execution_context=execution_context,
+        )
 
         if result["status"] == "complete":
             return {

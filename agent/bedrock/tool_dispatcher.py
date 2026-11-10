@@ -20,7 +20,11 @@ TOOL_REGISTRY = {
 }
 
 
-def dispatch_tool(tool_name: str, tool_input: dict) -> dict:
+def dispatch_tool(
+    tool_name: str,
+    tool_input: dict,
+    execution_context: dict | None = None,
+) -> dict:
     """Validate and execute an approved read-only tool."""
 
     if tool_name not in TOOL_REGISTRY:

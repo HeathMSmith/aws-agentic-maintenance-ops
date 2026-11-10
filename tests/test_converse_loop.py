@@ -276,3 +276,76 @@ def test_complete_four_tool_investigation():
     assert results_by_id["tool-002"]["asset_id"] == "CONV-MTR-042"
     assert results_by_id["tool-003"]["record_count"] == 2
     assert results_by_id["tool-004"]["line_id"] == "PKG-LINE-02"
+
+
+def test_execution_context_propagates_across_tool_calls(monkeypatch):
+    from agent.bedrock import tool_results
+
+    captured = []
+
+    def fake_dispatch(tool_name, tool_input, execution_context=None):
+        captured.append(
+            {
+                "tool_name": tool_name,
+                "execution_context": execution_context,
+            }
+        )
+        return {"status": "ok"}
+
+    monkeypatch.setattr(
+        tool_results,
+        "dispatch_tool",
+        fake_dispatch,
+    )
+
+    second_response = {
+        "stopReason": "tool_use",
+        "output": {
+            "message": {
+                "role": "assistant",
+                "content": [
+                    {
+                        "toolUse": {
+                            "toolUseId": "tool-002",
+                            "name": "get_asset_context",
+                            "input": {"asset_id": "CONV-MTR-042"},
+                        }
+                    }
+                ],
+            }
+        },
+    }
+
+    client = FakeBedrockClient(
+        [
+            tool_request(),
+            second_response,
+            final_response(),
+        ]
+    )
+
+    context = {
+        "reference_timestamp": "2026-11-10T18:00:00Z",
+    }
+
+    result = run_conversation(
+        client,
+        "simulated-model",
+        "Investigate ALERT-0001",
+        max_model_calls=3,
+        execution_context=context,
+    )
+
+    assert result["status"] == "complete"
+    assert result["model_calls"] == 3
+
+    assert captured == [
+        {
+            "tool_name": "get_equipment_alert",
+            "execution_context": context,
+        },
+        {
+            "tool_name": "get_asset_context",
+            "execution_context": context,
+        },
+    ]

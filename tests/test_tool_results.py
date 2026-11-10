@@ -72,3 +72,51 @@ def test_invalid_tool_input_returns_error(tool_input):
 
     assert result["status"] == "error"
     assert result["content"][0]["json"]["error"] == "invalid_tool_input"
+
+
+def test_execution_context_forwarded_to_dispatcher(monkeypatch):
+    from agent.bedrock import tool_results
+
+    captured = {}
+
+    def fake_dispatch(tool_name, tool_input, execution_context=None):
+        captured["tool_name"] = tool_name
+        captured["tool_input"] = tool_input
+        captured["execution_context"] = execution_context
+
+        return {"asset_id": "CONV-MTR-042"}
+
+    monkeypatch.setattr(
+        tool_results,
+        "dispatch_tool",
+        fake_dispatch,
+    )
+
+    context = {
+        "reference_timestamp": "2026-11-10T18:00:00Z",
+    }
+
+    tool_use = {
+        "toolUseId": "tool-001",
+        "name": "get_asset_context",
+        "input": {"asset_id": "CONV-MTR-042"},
+    }
+
+    message = tool_results.build_tool_result_message(
+        tool_use,
+        execution_context=context,
+    )
+
+    assert captured == {
+        "tool_name": "get_asset_context",
+        "tool_input": {"asset_id": "CONV-MTR-042"},
+        "execution_context": context,
+    }
+
+    tool_result = message["content"][0]["toolResult"]
+
+    assert tool_result["toolUseId"] == "tool-001"
+    assert tool_result["status"] == "success"
+    assert tool_result["content"][0]["json"] == {
+        "asset_id": "CONV-MTR-042",
+    }

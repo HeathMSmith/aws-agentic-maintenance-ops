@@ -118,6 +118,7 @@ def test_unsupported_asset_operation():
         "message": "Tool 'delete_asset' is not allowed",
     }
 
+
 def test_valid_maintenance_history_lookup():
     result = dispatch_tool(
         "get_maintenance_history",
@@ -183,6 +184,7 @@ def test_unsupported_maintenance_operation():
         "message": "Tool 'delete_maintenance_record' is not allowed",
     }
 
+
 def test_valid_production_schedule_lookup():
     result = dispatch_tool(
         "get_production_schedule",
@@ -247,3 +249,16 @@ def test_unsupported_production_schedule_operation():
         "error": "unsupported_tool",
         "message": "Tool 'delete_production_schedule' is not allowed",
     }
+
+
+def test_existing_tool_accepts_execution_context():
+    result = dispatch_tool(
+        "get_asset_context",
+        {"asset_id": "CONV-MTR-042"},
+        execution_context={
+            "reference_timestamp": "2026-11-10T18:00:00Z",
+        },
+    )
+
+    assert result["asset_id"] == "CONV-MTR-042"
+    assert result["criticality"] == "high"
