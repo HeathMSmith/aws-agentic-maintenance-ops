@@ -2,6 +2,7 @@ from agent.tools.asset_context import get_asset_context
 from agent.tools.equipment_alert import get_equipment_alert
 from agent.tools.maintenance_history import get_maintenance_history
 from agent.tools.production_schedule import get_production_schedule
+from simulation.schedule_analysis import get_next_maintenance_window
 
 
 def investigate_incident(alert_id: str) -> dict:
@@ -42,6 +43,17 @@ def investigate_incident(alert_id: str) -> dict:
             "alert_id": alert_id,
             "error": production_schedule["error"],
         }
+    try:
+        maintenance_window = get_next_maintenance_window(
+            production_schedule["schedule"],
+            alert["timestamp"],
+        )
+    except (ValueError, KeyError, TypeError) as exc:
+        return {
+            "status": "failed",
+            "alert_id": alert_id,
+            "error": f"Invalid maintenance schedule data: {exc}",
+        }
 
     return {
         "status": "investigated",
@@ -50,4 +62,5 @@ def investigate_incident(alert_id: str) -> dict:
         "asset": asset,
         "maintenance_history": maintenance_history,
         "production_schedule": production_schedule,
+        "maintenance_window": maintenance_window,
     }

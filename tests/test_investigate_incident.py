@@ -18,6 +18,10 @@ def test_investigate_existing_incident():
     assert result["production_schedule"]["line_id"] == "PKG-LINE-02"
     assert result["production_schedule"]["line_status"] == "active"
     assert len(result["production_schedule"]["schedule"]) == 2
+    assert result["maintenance_window"]["available"] is True
+    assert result["maintenance_window"]["schedule_id"] == "MAINT-WINDOW-0001"
+    assert result["maintenance_window"]["hours_until_start"] == 7.5
+    assert result["maintenance_window"]["remaining_duration_hours"] == 4.0
 
 
 def test_investigate_nonexistent_alert():
@@ -89,5 +93,21 @@ def test_investigate_production_schedule_lookup_failure():
         "status": "failed",
         "alert_id": "ALERT-0001",
         "error": "Production schedule unavailable",
+    }
+
+def test_investigate_invalid_maintenance_window():
+    with patch(
+        "simulation.investigate_incident.get_next_maintenance_window",
+        side_effect=ValueError("maintenance window end must be after start"),
+    ):
+        result = investigate_incident("ALERT-0001")
+
+    assert result == {
+        "status": "failed",
+        "alert_id": "ALERT-0001",
+        "error": (
+            "Invalid maintenance schedule data: "
+            "maintenance window end must be after start"
+        ),
     }
     
