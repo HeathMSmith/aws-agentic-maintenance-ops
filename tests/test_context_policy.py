@@ -16,9 +16,7 @@ def investigation():
 def test_high_criticality_monitoring_requires_approval(investigation, severity):
     investigation["alert"]["severity"] = severity
 
-    result = evaluate_action_with_context(
-        "continue_monitoring", investigation
-    )
+    result = evaluate_action_with_context("continue_monitoring", investigation)
 
     assert result == {
         "action": "continue_monitoring",
@@ -30,17 +28,13 @@ def test_high_criticality_monitoring_requires_approval(investigation, severity):
 def test_low_criticality_monitoring_permitted(investigation):
     investigation["asset"]["criticality"] = "low"
 
-    result = evaluate_action_with_context(
-        "continue_monitoring", investigation
-    )
+    result = evaluate_action_with_context("continue_monitoring", investigation)
 
     assert result["decision"] == "permitted"
 
 
 def test_expert_review_permitted(investigation):
-    result = evaluate_action_with_context(
-        "request_expert_review", investigation
-    )
+    result = evaluate_action_with_context("request_expert_review", investigation)
 
     assert result["decision"] == "permitted"
 
@@ -67,9 +61,7 @@ def test_unsupported_action_rejected(investigation):
 def test_incomplete_investigation_rejected(investigation):
     investigation["status"] = "failed"
 
-    result = evaluate_action_with_context(
-        "continue_monitoring", investigation
-    )
+    result = evaluate_action_with_context("continue_monitoring", investigation)
 
     assert result == {
         "decision": "rejected",
@@ -81,13 +73,11 @@ def test_incomplete_investigation_rejected(investigation):
 def test_missing_evidence_rejected(investigation, missing_field):
     investigation.pop(missing_field)
 
-    result = evaluate_action_with_context(
-        "continue_monitoring", investigation
-    )
+    result = evaluate_action_with_context("continue_monitoring", investigation)
 
     assert result == {
         "decision": "rejected",
-        "reason": "required incident evidence is missing",
+        "reason": f"missing or invalid evidence: {missing_field}",
     }
 
 
@@ -98,9 +88,7 @@ def test_missing_evidence_rejected(investigation, missing_field):
 def test_invalid_severity_rejected(investigation, severity):
     investigation["alert"]["severity"] = severity
 
-    result = evaluate_action_with_context(
-        "continue_monitoring", investigation
-    )
+    result = evaluate_action_with_context("continue_monitoring", investigation)
 
     assert result["decision"] == "rejected"
     assert result["reason"] == "invalid or missing alert severity"
@@ -113,9 +101,58 @@ def test_invalid_severity_rejected(investigation, severity):
 def test_invalid_criticality_rejected(investigation, criticality):
     investigation["asset"]["criticality"] = criticality
 
-    result = evaluate_action_with_context(
-        "continue_monitoring", investigation
-    )
+    result = evaluate_action_with_context("continue_monitoring", investigation)
 
     assert result["decision"] == "rejected"
     assert result["reason"] == "invalid or missing asset criticality"
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "asset",
+        "maintenance_history",
+        "production_schedule",
+    ],
+)
+def test_policy_rejects_mismatched_asset_references(investigation, field):
+    investigation[field]["asset_id"] = "WRONG-ASSET"
+
+    result = evaluate_action_with_context("continue_monitoring", investigation)
+
+    assert result == {
+        "decision": "rejected",
+        "reason": f"asset_id mismatch: {field}",
+    }
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "maintenance_history",
+        "production_schedule",
+        "maintenance_window",
+    ],
+)
+def test_policy_rejects_missing_operational_evidence(investigation, field):
+    investigation.pop(field)
+
+    result = evaluate_action_with_context(
+        "create_maintenance_work_order", investigation
+    )
+
+    assert result == {
+        "decision": "rejected",
+        "reason": f"missing or invalid evidence: {field}",
+    }
+
+
+def test_policy_rejects_mismatched_maintenance_record(investigation):
+    investigation["maintenance_history"]["records"][0]["asset_id"] = "WRONG-ASSET"
+
+    result = evaluate_action_with_context("request_expert_review", investigation)
+
+    assert result == {
+        "decision": "rejected",
+        "reason": "maintenance history contains mismatched asset records",
+    }

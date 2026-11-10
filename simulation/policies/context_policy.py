@@ -1,4 +1,5 @@
 from simulation.policies.maintenance_policy import evaluate_maintenance_action
+from simulation.policies.evidence_validation import validate_investigation_evidence
 
 
 def evaluate_action_with_context(action: str, investigation: dict) -> dict:
@@ -9,27 +10,16 @@ def evaluate_action_with_context(action: str, investigation: dict) -> dict:
     if classification["decision"] == "rejected":
         return classification
 
-    if not isinstance(investigation, dict):
+    validation = validate_investigation_evidence(investigation)
+
+    if not validation["valid"]:
         return {
             "decision": "rejected",
-            "reason": "investigation must be a dictionary",
+            "reason": validation["reason"],
         }
 
-    if investigation.get("status") != "investigated":
-        return {
-            "decision": "rejected",
-            "reason": "investigation is incomplete",
-        }
-
-    alert = investigation.get("alert")
-    asset = investigation.get("asset")
-
-    if not isinstance(alert, dict) or not isinstance(asset, dict):
-        return {
-            "decision": "rejected",
-            "reason": "required incident evidence is missing",
-        }
-
+    alert = investigation["alert"]
+    asset = investigation["asset"]
     severity = alert.get("severity")
     criticality = asset.get("criticality")
 
