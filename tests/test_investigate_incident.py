@@ -11,6 +11,9 @@ def test_investigate_existing_incident():
     assert result["alert"]["asset_id"] == "CONV-MTR-042"
     assert result["asset"]["asset_id"] == "CONV-MTR-042"
     assert result["asset"]["criticality"] == "high"
+    assert result["maintenance_history"]["asset_id"] == "CONV-MTR-042"
+    assert result["maintenance_history"]["record_count"] == 2
+    assert result["maintenance_history"]["records"][0]["record_id"] == "MAINT-0002"
 
 
 def test_investigate_nonexistent_alert():
@@ -39,3 +42,33 @@ def test_investigate_missing_asset():
         "alert_id": "ALERT-MISSING-ASSET",
         "error": "Asset not found: UNKNOWN-MOTOR",
     }
+
+def test_investigate_asset_without_maintenance_history():
+    empty_history = {
+        "asset_id": "CONV-MTR-042",
+        "record_count": 0,
+        "records": [],
+    }
+
+    with patch(
+        "simulation.investigate_incident.get_maintenance_history",
+        return_value=empty_history,
+    ):
+        result = investigate_incident("ALERT-0001")
+
+    assert result["status"] == "investigated"
+    assert result["maintenance_history"] == empty_history
+
+def test_investigate_maintenance_history_lookup_failure():
+    with patch(
+        "simulation.investigate_incident.get_maintenance_history",
+        return_value={"error": "Maintenance history unavailable"},
+    ):
+        result = investigate_incident("ALERT-0001")
+
+    assert result == {
+        "status": "failed",
+        "alert_id": "ALERT-0001",
+        "error": "Maintenance history unavailable",
+    }
+    
