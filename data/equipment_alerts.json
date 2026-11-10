@@ -1,0 +1,21 @@
+{
+  "alerts": [
+    {
+      "alert_id": "ALERT-0001",
+      "asset_id": "CONV-MTR-042",
+      "timestamp": "2026-11-09T14:30:00Z",
+      "alert_type": "equipment_anomaly",
+      "severity": "warning",
+      "status": "new",
+      "observations": {
+        "vibration_rms_mm_s": 8.2,
+        "temperature_c": 89.0
+      },
+      "baseline": {
+        "vibration_rms_mm_s": 2.1,
+        "temperature_c": 62.0
+      },
+      "description": "Elevated vibration and temperature detected on conveyor motor."
+    }
+  ]
+}
