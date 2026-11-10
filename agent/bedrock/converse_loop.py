@@ -32,7 +32,7 @@ def run_conversation(
             modelId=model_id,
             messages=messages,
             toolConfig=TOOL_CONFIG,
-            inferenceConfig={"maxTokens": 512},
+            inferenceConfig={"maxTokens": 2048},
         )
 
         result = handle_converse_response(response)
