@@ -262,3 +262,134 @@ def test_existing_tool_accepts_execution_context():
 
     assert result["asset_id"] == "CONV-MTR-042"
     assert result["criticality"] == "high"
+
+def test_maintenance_window_status_with_valid_context():
+    result = dispatch_tool(
+        "get_maintenance_window_status",
+        {"asset_id": "CONV-MTR-042"},
+        execution_context={
+            "reference_timestamp": "2026-11-10T18:00:00Z",
+        },
+    )
+
+    assert result["asset_id"] == "CONV-MTR-042"
+    assert result["line_id"] == "PKG-LINE-02"
+    assert result["reference_timestamp"] == "2026-11-10T18:00:00Z"
+
+    assert result["maintenance_window"] == {
+        "available": False,
+        "reason": "No upcoming maintenance window found",
+    }
+
+
+def test_maintenance_window_status_at_incident_time():
+    result = dispatch_tool(
+        "get_maintenance_window_status",
+        {"asset_id": "CONV-MTR-042"},
+        execution_context={
+            "reference_timestamp": "2026-11-09T14:30:00Z",
+        },
+    )
+
+    window = result["maintenance_window"]
+
+    assert window["available"] is True
+    assert window["schedule_id"] == "MAINT-WINDOW-0001"
+    assert window["hours_until_start"] == 7.5
+    assert window["remaining_duration_hours"] == 4.0
+
+
+@pytest.mark.parametrize(
+    "tool_input",
+    [
+        {},
+        {"asset_id": ""},
+        {"asset_id": "   "},
+        {"asset_id": None},
+        {"asset_id": 123},
+        {"asset_id": "CONV-MTR-042", "extra": "unexpected"},
+        {"asset_id": "CONV-MTR-042", "reference_timestamp": "2026-11-09T14:30:00Z"},
+        None,
+        "CONV-MTR-042",
+    ],
+)
+def test_maintenance_window_status_invalid_arguments(tool_input):
+    result = dispatch_tool(
+        "get_maintenance_window_status",
+        tool_input,
+        execution_context={
+            "reference_timestamp": "2026-11-10T18:00:00Z",
+        },
+    )
+
+    assert result == {
+        "error": "invalid_tool_input",
+        "message": (
+            "get_maintenance_window_status requires "
+            "a non-empty asset_id string"
+        ),
+    }
+
+
+@pytest.mark.parametrize(
+    "execution_context",
+    [
+        None,
+        {},
+        {"other_field": "value"},
+        "2026-11-10T18:00:00Z",
+    ],
+)
+def test_maintenance_window_status_missing_context(execution_context):
+    result = dispatch_tool(
+        "get_maintenance_window_status",
+        {"asset_id": "CONV-MTR-042"},
+        execution_context=execution_context,
+    )
+
+    assert result == {
+        "error": "missing_execution_context",
+        "message": "A trusted reference_timestamp is required",
+    }
+
+
+@pytest.mark.parametrize(
+    "timestamp",
+    [
+        "",
+        "invalid-timestamp",
+        "2026-11-10T18:00:00",
+        None,
+        123,
+    ],
+)
+def test_maintenance_window_status_invalid_context_timestamp(timestamp):
+    result = dispatch_tool(
+        "get_maintenance_window_status",
+        {"asset_id": "CONV-MTR-042"},
+        execution_context={
+            "reference_timestamp": timestamp,
+        },
+    )
+
+    assert result == {
+        "error": "invalid_execution_context",
+        "message": (
+            "reference_timestamp must be a timezone-aware "
+            "ISO 8601 timestamp"
+        ),
+    }
+
+
+def test_maintenance_window_status_missing_schedule():
+    result = dispatch_tool(
+        "get_maintenance_window_status",
+        {"asset_id": "UNKNOWN-ASSET"},
+        execution_context={
+            "reference_timestamp": "2026-11-10T18:00:00Z",
+        },
+    )
+
+    assert result == {
+        "error": "No production schedule found for asset: UNKNOWN-ASSET",
+    }

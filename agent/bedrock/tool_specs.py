@@ -116,11 +116,43 @@ PRODUCTION_SCHEDULE_TOOL = {
     }
 }
 
+MAINTENANCE_WINDOW_STATUS_TOOL = {
+    "toolSpec": {
+        "name": "get_maintenance_window_status",
+        "description": (
+            "Calculate maintenance-window availability for an equipment asset "
+            "using a reference timestamp supplied by the application. "
+            "Returns the reference timestamp, availability, and details of "
+            "the next eligible maintenance window when one exists. "
+            "Use this tool instead of independently calculating whether "
+            "a scheduled maintenance window is currently available. "
+            "Availability does not authorize maintenance or shutdown actions."
+        ),
+        "inputSchema": {
+            "json": {
+                "type": "object",
+                "properties": {
+                    "asset_id": {
+                        "type": "string",
+                        "description": (
+                            "Unique identifier of the equipment asset, "
+                            "for example CONV-MTR-042."
+                        ),
+                    }
+                },
+                "required": ["asset_id"],
+                "additionalProperties": False,
+            }
+        },
+    }
+}
+
 TOOL_CONFIG = {
     "tools": [
         EQUIPMENT_ALERT_TOOL,
         ASSET_CONTEXT_TOOL,
         MAINTENANCE_HISTORY_TOOL,
         PRODUCTION_SCHEDULE_TOOL,
+        MAINTENANCE_WINDOW_STATUS_TOOL,
     ]
 }
