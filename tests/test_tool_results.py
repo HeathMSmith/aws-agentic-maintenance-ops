@@ -120,3 +120,134 @@ def test_execution_context_forwarded_to_dispatcher(monkeypatch):
     assert tool_result["content"][0]["json"] == {
         "asset_id": "CONV-MTR-042",
     }
+
+def test_rejects_mismatched_evidence_result(monkeypatch):
+    from agent.bedrock import tool_results
+
+    def fake_dispatch_tool(
+        tool_name,
+        tool_input,
+        execution_context=None,
+    ):
+        return {
+            "asset_id": "CONV-MTR-999",
+            "criticality": "high",
+        }
+
+    monkeypatch.setattr(
+        tool_results,
+        "dispatch_tool",
+        fake_dispatch_tool,
+    )
+
+    tool_use = {
+        "toolUseId": "tool-mismatch-001",
+        "name": "get_asset_context",
+        "input": {
+            "asset_id": "CONV-MTR-042",
+        },
+    }
+
+    message = tool_results.build_tool_result_message(tool_use)
+
+    result = message["content"][0]["toolResult"]
+
+    assert result["toolUseId"] == "tool-mismatch-001"
+    assert result["status"] == "error"
+
+    assert result["content"] == [
+        {
+            "json": {
+                "error": "invalid_evidence_result",
+                "message": "evidence result identifier mismatch",
+            }
+        }
+    ]
+
+def test_accepts_matching_evidence_result(monkeypatch):
+    from agent.bedrock import tool_results
+
+    expected_evidence = {
+        "asset_id": "CONV-MTR-042",
+        "name": "Packaging Conveyor Motor 042",
+        "criticality": "high",
+    }
+
+    def fake_dispatch_tool(
+        tool_name,
+        tool_input,
+        execution_context=None,
+    ):
+        return expected_evidence
+
+    monkeypatch.setattr(
+        tool_results,
+        "dispatch_tool",
+        fake_dispatch_tool,
+    )
+
+    tool_use = {
+        "toolUseId": "tool-match-001",
+        "name": "get_asset_context",
+        "input": {
+            "asset_id": "CONV-MTR-042",
+        },
+    }
+
+    message = tool_results.build_tool_result_message(tool_use)
+
+    result = message["content"][0]["toolResult"]
+
+    assert result["toolUseId"] == "tool-match-001"
+    assert result["status"] == "success"
+    assert result["content"] == [
+        {
+            "json": expected_evidence,
+        }
+    ]
+
+def test_policy_evaluation_bypasses_evidence_result_validation(monkeypatch):
+    from agent.bedrock import tool_results
+
+    expected_policy_result = {
+        "alert_id": "ALERT-0001",
+        "proposed_action": "request_equipment_shutdown",
+        "policy_decision": {
+            "decision": "requires_approval",
+        },
+    }
+
+    def fake_dispatch_tool(
+        tool_name,
+        tool_input,
+        execution_context=None,
+    ):
+        assert tool_name == "evaluate_proposed_maintenance_action"
+        return expected_policy_result
+
+    monkeypatch.setattr(
+        tool_results,
+        "dispatch_tool",
+        fake_dispatch_tool,
+    )
+
+    tool_use = {
+        "toolUseId": "policy-001",
+        "name": "evaluate_proposed_maintenance_action",
+        "input": {
+            "alert_id": "ALERT-0001",
+            "action": "request_equipment_shutdown",
+        },
+    }
+
+    message = tool_results.build_tool_result_message(tool_use)
+
+    result = message["content"][0]["toolResult"]
+
+    assert result["toolUseId"] == "policy-001"
+    assert result["status"] == "success"
+    assert result["content"] == [
+        {
+            "json": expected_policy_result,
+        }
+    ]
