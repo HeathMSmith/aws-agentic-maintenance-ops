@@ -3,6 +3,7 @@
 from agent.bedrock.converse_loop import run_conversation
 from agent.bedrock.policy_gate import evaluate_structured_action_proposal
 from agent.bedrock.proposal_generator import generate_action_proposal
+from agent.bedrock.evidence_completeness import validate_evidence_completeness
 
 
 def run_investigation_workflow(
@@ -30,6 +31,17 @@ def run_investigation_workflow(
         return {
             "status": "rejected",
             "reason": "investigation did not complete",
+            "investigation": investigation,
+        }
+    evidence_validation = validate_evidence_completeness(
+        investigation.get("execution_trace")
+    )
+
+    if not evidence_validation["valid"]:
+        return {
+            "status": "rejected",
+            "reason": "investigation evidence is incomplete",
+            "evidence_validation": evidence_validation,
             "investigation": investigation,
         }
 

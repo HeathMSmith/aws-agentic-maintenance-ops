@@ -1,5 +1,44 @@
 from agent.bedrock.investigation_workflow import run_investigation_workflow
 
+def make_evidence_tool_response():
+    """Simulate Bedrock requesting all five required evidence tools."""
+
+    return {
+        "stopReason": "tool_use",
+        "output": {
+            "message": {
+                "role": "assistant",
+                "content": [
+                    {
+                        "toolUse": {
+                            "toolUseId": f"evidence-{index}",
+                            "name": tool_name,
+                            "input": tool_input,
+                        }
+                    }
+                    for index, (tool_name, tool_input) in enumerate(
+                        [
+                            ("get_equipment_alert", {"alert_id": "ALERT-0001"}),
+                            ("get_asset_context", {"asset_id": "CONV-MTR-042"}),
+                            (
+                                "get_maintenance_history",
+                                {"asset_id": "CONV-MTR-042"},
+                            ),
+                            (
+                                "get_production_schedule",
+                                {"asset_id": "CONV-MTR-042"},
+                            ),
+                            (
+                                "get_maintenance_window_status",
+                                {"asset_id": "CONV-MTR-042"},
+                            ),
+                        ],
+                        start=1,
+                    )
+                ],
+            }
+        },
+    }
 
 def test_workflow_requires_approval_for_shutdown_proposal():
     class FakeClient:
@@ -10,6 +49,9 @@ def test_workflow_requires_approval_for_shutdown_proposal():
             self.calls.append(kwargs)
 
             if len(self.calls) == 1:
+                return make_evidence_tool_response()
+
+            if len(self.calls) == 2:
                 return {
                     "stopReason": "end_turn",
                     "output": {
@@ -26,7 +68,6 @@ def test_workflow_requires_approval_for_shutdown_proposal():
                         }
                     },
                 }
-
             return {
                 "stopReason": "tool_use",
                 "output": {
@@ -64,7 +105,7 @@ def test_workflow_requires_approval_for_shutdown_proposal():
     )
 
     assert result["status"] == "evaluated"
-    assert len(client.calls) == 2
+    assert len(client.calls) == 3
 
     assert result["proposal"]["alert_id"] == "ALERT-0001"
     assert result["proposal"]["proposed_action"] == "request_equipment_shutdown"
@@ -76,7 +117,8 @@ def test_workflow_requires_approval_for_shutdown_proposal():
 
     # The two Converse phases use separate tool configurations.
     assert len(client.calls[0]["toolConfig"]["tools"]) == 6
-    assert len(client.calls[1]["toolConfig"]["tools"]) == 1
+    assert len(client.calls[1]["toolConfig"]["tools"]) == 6
+    assert len(client.calls[2]["toolConfig"]["tools"]) == 1
 
 def test_workflow_rejects_incomplete_investigation():
     class FakeClient:
@@ -127,6 +169,9 @@ def test_workflow_rejects_invalid_action_proposal():
             self.calls.append(kwargs)
 
             if len(self.calls) == 1:
+                return make_evidence_tool_response()
+
+            if len(self.calls) == 2:
                 return {
                     "stopReason": "end_turn",
                     "output": {
@@ -182,7 +227,7 @@ def test_workflow_rejects_invalid_action_proposal():
         "reason": "unsupported proposed maintenance action",
     }
 
-    assert len(client.calls) == 2
+    assert len(client.calls) == 3
 
 def test_workflow_rejects_mismatched_proposal_alert():
     class FakeClient:
@@ -193,6 +238,9 @@ def test_workflow_rejects_mismatched_proposal_alert():
             self.calls.append(kwargs)
 
             if len(self.calls) == 1:
+                return make_evidence_tool_response()
+
+            if len(self.calls) == 2:
                 return {
                     "stopReason": "end_turn",
                     "output": {
@@ -249,4 +297,4 @@ def test_workflow_rejects_mismatched_proposal_alert():
     }
 
     assert result["proposal"]["alert_id"] == "ALERT-9999"
-    assert len(client.calls) == 2
+    assert len(client.calls) == 3
