@@ -2,7 +2,10 @@ from copy import deepcopy
 
 import pytest
 
+from agent.bedrock import execution_context
 from agent.bedrock.converse_loop import run_conversation
+from datetime import datetime, timezone
+from unittest.mock import patch
 
 
 def tool_request():
@@ -349,3 +352,171 @@ def test_execution_context_propagates_across_tool_calls(monkeypatch):
             "execution_context": context,
         },
     ]
+def test_run_conversation_creates_execution_context():
+    fixed_time = datetime(2026, 11, 11, 14, 30, tzinfo=timezone.utc)
+
+    response = {
+        "stopReason": "end_turn",
+        "output": {
+            "message": {
+                "role": "assistant",
+                "content": [{"text": "Investigation complete."}],
+            }
+        },
+    }
+
+    class FakeClient:
+        def converse(self, **kwargs):
+            return response
+
+    with (
+        patch(
+            "agent.bedrock.execution_context.datetime"
+        ) as mock_datetime,
+        patch(
+            "agent.bedrock.converse_loop.handle_converse_response"
+        ) as mock_handler,
+    ):
+        mock_datetime.now.return_value = fixed_time
+
+        mock_handler.return_value = {
+            "status": "complete",
+            "text": "Investigation complete.",
+        }
+
+        run_conversation(
+            client=FakeClient(),
+            model_id="test-model",
+            prompt="Investigate the equipment alert.",
+        )
+
+        mock_handler.assert_called_once()
+
+        execution_context = mock_handler.call_args.kwargs["execution_context"]
+
+        assert execution_context == {
+            "reference_timestamp": "2026-11-11T14:30:00Z"
+        }
+
+        mock_datetime.now.assert_called_once_with(timezone.utc)
+
+def test_run_conversation_normalizes_historical_execution_context():
+    response = {
+        "stopReason": "end_turn",
+        "output": {
+            "message": {
+                "role": "assistant",
+                "content": [{"text": "Investigation complete."}],
+            }
+        },
+    }
+
+    class FakeClient:
+        def converse(self, **kwargs):
+            return response
+
+    with patch(
+        "agent.bedrock.converse_loop.handle_converse_response"
+    ) as mock_handler:
+        mock_handler.return_value = {
+            "status": "complete",
+            "text": "Investigation complete.",
+        }
+
+        run_conversation(
+            client=FakeClient(),
+            model_id="test-model",
+            prompt="Investigate the historical equipment alert.",
+            execution_context={
+                "reference_timestamp": "2026-11-10T13:00:00-05:00",
+            },
+        )
+
+        mock_handler.assert_called_once()
+
+        execution_context = mock_handler.call_args.kwargs[
+            "execution_context"
+        ]
+
+        assert execution_context == {
+            "reference_timestamp": "2026-11-10T18:00:00Z"
+        }
+
+def test_conversation_executes_maintenance_window_tool_with_trusted_timestamp():
+    tool_request = {
+        "stopReason": "tool_use",
+        "output": {
+            "message": {
+                "role": "assistant",
+                "content": [
+                    {
+                        "toolUse": {
+                            "toolUseId": "window-tool-001",
+                            "name": "get_maintenance_window_status",
+                            "input": {"asset_id": "CONV-MTR-042"},
+                        }
+                    }
+                ],
+            }
+        },
+    }
+
+    final_response = {
+        "stopReason": "end_turn",
+        "output": {
+            "message": {
+                "role": "assistant",
+                "content": [{"text": "Maintenance window unavailable."}],
+            }
+        },
+    }
+
+    class FakeClient:
+        def __init__(self):
+            self.calls = []
+
+        def converse(self, **kwargs):
+            self.calls.append(kwargs)
+
+            if len(self.calls) == 1:
+                return tool_request
+
+            return final_response
+
+    client = FakeClient()
+
+    result = run_conversation(
+        client=client,
+        model_id="test-model",
+        prompt="Check the maintenance window for CONV-MTR-042.",
+        execution_context={
+            "reference_timestamp": "2026-11-10T13:00:00-05:00",
+        },
+    )
+
+    assert result["status"] == "complete"
+    assert len(client.calls) == 2
+
+    messages = client.calls[1]["messages"]
+
+    tool_results = [
+        block["toolResult"]
+        for message in messages
+        for block in message["content"]
+        if "toolResult" in block
+    ]
+
+    assert len(tool_results) == 1
+
+    tool_result = tool_results[0]
+
+    assert tool_result["toolUseId"] == "window-tool-001"
+
+    payload = tool_result["content"][0]["json"]
+
+    assert payload["asset_id"] == "CONV-MTR-042"
+    assert payload["reference_timestamp"] == "2026-11-10T18:00:00Z"
+    assert payload["maintenance_window"] == {
+        "available": False,
+        "reason": "No upcoming maintenance window found",
+    }

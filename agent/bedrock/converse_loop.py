@@ -1,5 +1,6 @@
 """Coordinate a bounded Bedrock Converse tool-use workflow."""
 
+from agent.bedrock.execution_context import create_execution_context
 from agent.bedrock.response_handler import handle_converse_response
 from agent.bedrock.tool_specs import TOOL_CONFIG
 
@@ -27,6 +28,13 @@ def run_conversation(
     ]
 
     execution_trace = []
+
+    if execution_context is None:
+        execution_context = create_execution_context()
+    else:
+        execution_context = create_execution_context(
+            execution_context["reference_timestamp"]
+    )
 
     for model_call_number in range(1, max_model_calls + 1):
         response = client.converse(
