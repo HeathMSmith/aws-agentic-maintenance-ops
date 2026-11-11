@@ -8,6 +8,9 @@ from agent.tools.maintenance_history import get_maintenance_history
 from agent.tools.production_schedule import get_production_schedule
 from agent.tools.maintenance_window_status import get_maintenance_window_status
 from simulation.clock import parse_simulation_time
+from agent.tools.maintenance_action_evaluation import (
+    evaluate_proposed_maintenance_action,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -66,6 +69,35 @@ def dispatch_tool(
         result = get_maintenance_window_status(
             tool_input["asset_id"],
             reference_timestamp,
+        )
+
+        logger.info(
+            "Tool execution completed: tool=%s status=%s",
+            tool_name,
+            "error" if "error" in result else "success",
+        )
+
+        return result
+    if tool_name == "evaluate_proposed_maintenance_action":
+        if (
+            not isinstance(tool_input, dict)
+            or set(tool_input) != {"alert_id", "action"}
+            or not isinstance(tool_input["alert_id"], str)
+            or not tool_input["alert_id"].strip()
+            or not isinstance(tool_input["action"], str)
+            or not tool_input["action"].strip()
+        ):
+            return {
+                "error": "invalid_tool_input",
+                "message": (
+                    "evaluate_proposed_maintenance_action requires "
+                    "non-empty alert_id and action strings"
+                ),
+            }
+
+        result = evaluate_proposed_maintenance_action(
+            tool_input["alert_id"],
+            tool_input["action"],
         )
 
         logger.info(

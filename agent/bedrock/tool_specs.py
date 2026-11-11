@@ -147,6 +147,43 @@ MAINTENANCE_WINDOW_STATUS_TOOL = {
     }
 }
 
+MAINTENANCE_ACTION_EVALUATION_TOOL = {
+    "toolSpec": {
+        "name": "evaluate_proposed_maintenance_action",
+        "description": (
+            "Evaluate a proposed maintenance action against deterministic "
+            "incident evidence and operational policy. Returns permitted, "
+            "requires_approval, or rejected. This tool only evaluates "
+            "actions; it does not approve, schedule, or execute them."
+        ),
+        "inputSchema": {
+            "json": {
+                "type": "object",
+                "properties": {
+                    "alert_id": {
+                        "type": "string",
+                        "description": "Identifier of the equipment alert.",
+                    },
+                    "action": {
+                        "type": "string",
+                        "description": (
+                            "Proposed action to evaluate against policy."
+                        ),
+                        "enum": [
+                            "continue_monitoring",
+                            "request_expert_review",
+                            "create_maintenance_work_order",
+                            "request_equipment_shutdown",
+                        ],
+                    },
+                },
+                "required": ["alert_id", "action"],
+                "additionalProperties": False,
+            }
+        },
+    }
+}
+
 TOOL_CONFIG = {
     "tools": [
         EQUIPMENT_ALERT_TOOL,
@@ -154,5 +191,6 @@ TOOL_CONFIG = {
         MAINTENANCE_HISTORY_TOOL,
         PRODUCTION_SCHEDULE_TOOL,
         MAINTENANCE_WINDOW_STATUS_TOOL,
+        MAINTENANCE_ACTION_EVALUATION_TOOL,
     ]
 }

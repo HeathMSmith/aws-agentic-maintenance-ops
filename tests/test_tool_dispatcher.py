@@ -393,3 +393,88 @@ def test_maintenance_window_status_missing_schedule():
     assert result == {
         "error": "No production schedule found for asset: UNKNOWN-ASSET",
     }
+@pytest.mark.parametrize(
+    ("action", "expected_decision"),
+    [
+        ("continue_monitoring", "requires_approval"),
+        ("request_expert_review", "permitted"),
+        ("create_maintenance_work_order", "requires_approval"),
+        ("request_equipment_shutdown", "requires_approval"),
+    ],
+)
+def test_dispatch_maintenance_action_evaluation(action, expected_decision):
+    result = dispatch_tool(
+        "evaluate_proposed_maintenance_action",
+        {
+            "alert_id": "ALERT-0001",
+            "action": action,
+        },
+    )
+
+    assert result["alert_id"] == "ALERT-0001"
+    assert result["asset_id"] == "CONV-MTR-042"
+    assert result["action"] == action
+    assert result["policy_decision"]["decision"] == expected_decision
+
+
+@pytest.mark.parametrize(
+    "tool_input",
+    [
+        {},
+        {"alert_id": "ALERT-0001"},
+        {"action": "request_expert_review"},
+        {"alert_id": "", "action": "request_expert_review"},
+        {"alert_id": "ALERT-0001", "action": ""},
+        {"alert_id": None, "action": "request_expert_review"},
+        {"alert_id": "ALERT-0001", "action": None},
+        {"alert_id": 123, "action": "request_expert_review"},
+        {"alert_id": "ALERT-0001", "action": 123},
+        {
+            "alert_id": "ALERT-0001",
+            "action": "request_equipment_shutdown",
+            "approved": True,
+        },
+        None,
+        "ALERT-0001",
+    ],
+)
+def test_dispatch_maintenance_action_invalid_input(tool_input):
+    result = dispatch_tool(
+        "evaluate_proposed_maintenance_action",
+        tool_input,
+    )
+
+    assert result == {
+        "error": "invalid_tool_input",
+        "message": (
+            "evaluate_proposed_maintenance_action requires "
+            "non-empty alert_id and action strings"
+        ),
+    }
+
+
+def test_dispatch_maintenance_action_unsupported_action():
+    result = dispatch_tool(
+        "evaluate_proposed_maintenance_action",
+        {
+            "alert_id": "ALERT-0001",
+            "action": "restart_equipment",
+        },
+    )
+
+    assert result["policy_decision"]["decision"] == "rejected"
+    assert "Unsupported maintenance action" in (
+        result["policy_decision"]["reason"]
+    )
+
+
+def test_dispatch_maintenance_action_unknown_alert():
+    result = dispatch_tool(
+        "evaluate_proposed_maintenance_action",
+        {
+            "alert_id": "UNKNOWN-ALERT",
+            "action": "request_expert_review",
+        },
+    )
+
+    assert result["error"] == "investigation_failed"
