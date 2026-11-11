@@ -44,13 +44,10 @@ def test_workflow_requires_approval_for_shutdown_proposal():
     class FakeClient:
         def __init__(self):
             self.calls = []
-
         def converse(self, **kwargs):
             self.calls.append(kwargs)
-
             if len(self.calls) == 1:
                 return make_evidence_tool_response()
-
             if len(self.calls) == 2:
                 return {
                     "stopReason": "end_turn",
@@ -298,3 +295,117 @@ def test_workflow_rejects_mismatched_proposal_alert():
 
     assert result["proposal"]["alert_id"] == "ALERT-9999"
     assert len(client.calls) == 3
+
+def test_workflow_rejects_mismatched_evidence_asset():
+    class FakeClient:
+        def __init__(self):
+            self.calls = []
+
+        def converse(self, **kwargs):
+            self.calls.append(kwargs)
+
+            if len(self.calls) == 1:
+                response = make_evidence_tool_response()
+
+                for block in response["output"]["message"]["content"]:
+                    tool_use = block["toolUse"]
+
+                    if tool_use["name"] == "get_maintenance_history":
+                        tool_use["input"]["asset_id"] = "CONV-MTR-999"
+
+                return response
+
+            if len(self.calls) == 2:
+                return {
+                    "stopReason": "end_turn",
+                    "output": {
+                        "message": {
+                            "role": "assistant",
+                            "content": [
+                                {"text": "Investigation complete."}
+                            ],
+                        }
+                    },
+                }
+
+            raise AssertionError(
+                "Proposal generation must not occur for mismatched evidence"
+            )
+
+    client = FakeClient()
+
+    result = run_investigation_workflow(
+        client=client,
+        model_id="test-model",
+        alert_id="ALERT-0001",
+        execution_context={
+            "reference_timestamp": "2026-11-10T18:00:00Z",
+        },
+    )
+
+    assert result["status"] == "rejected"
+    assert result["reason"] == (
+        "investigation evidence identity is invalid"
+    )
+
+    assert result["identity_validation"][
+        "missing_or_mismatched_tools"
+    ] == ["get_maintenance_history"]
+
+    assert len(client.calls) == 2
+
+def test_workflow_rejects_mismatched_evidence_alert():
+    class FakeClient:
+        def __init__(self):
+            self.calls = []
+
+        def converse(self, **kwargs):
+            self.calls.append(kwargs)
+
+            if len(self.calls) == 1:
+                response = make_evidence_tool_response()
+
+                for block in response["output"]["message"]["content"]:
+                    tool_use = block["toolUse"]
+
+                    if tool_use["name"] == "get_equipment_alert":
+                        tool_use["input"]["alert_id"] = "ALERT-9999"
+
+                return response
+
+            if len(self.calls) == 2:
+                return {
+                    "stopReason": "end_turn",
+                    "output": {
+                        "message": {
+                            "role": "assistant",
+                            "content": [
+                                {"text": "Investigation complete."}
+                            ],
+                        }
+                    },
+                }
+
+            raise AssertionError(
+                "Proposal generation must not occur for mismatched alert evidence"
+            )
+
+    client = FakeClient()
+
+    result = run_investigation_workflow(
+        client=client,
+        model_id="test-model",
+        alert_id="ALERT-0001",
+        execution_context={
+            "reference_timestamp": "2026-11-10T18:00:00Z",
+        },
+    )
+
+    assert result["status"] == "rejected"
+    assert result["reason"] == "investigation evidence is incomplete"
+
+    assert result["evidence_validation"]["missing_tools"] == [
+        "get_equipment_alert"
+    ]
+
+    assert len(client.calls) == 2

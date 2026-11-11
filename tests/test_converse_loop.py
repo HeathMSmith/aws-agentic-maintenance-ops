@@ -73,6 +73,9 @@ def test_complete_tool_use_cycle():
                 "model_call": 1,
                 "tool_name": "get_equipment_alert",
                 "status": "success",
+                "identifiers": {
+                    "alert_id": "ALERT-0001",
+                },
             }
         ],
     }
@@ -112,6 +115,9 @@ def test_model_call_limit():
                 "model_call": 1,
                 "tool_name": "get_equipment_alert",
                 "status": "success",
+                "identifiers": {
+                    "alert_id": "ALERT-0001",
+                },
             }
         ],
     }
@@ -237,21 +243,33 @@ def test_complete_four_tool_investigation():
             "model_call": 1,
             "tool_name": "get_equipment_alert",
             "status": "success",
+            "identifiers": {
+                "alert_id": "ALERT-0001",
+            },
         },
         {
             "model_call": 2,
             "tool_name": "get_asset_context",
             "status": "success",
+            "identifiers": {
+                "asset_id": "CONV-MTR-042",
+            },
         },
         {
             "model_call": 2,
             "tool_name": "get_maintenance_history",
             "status": "success",
+            "identifiers": {
+                "asset_id": "CONV-MTR-042",
+            },
         },
         {
             "model_call": 2,
             "tool_name": "get_production_schedule",
             "status": "success",
+            "identifiers": {
+                "asset_id": "CONV-MTR-042",
+            },
         },
     ]
 
@@ -352,6 +370,8 @@ def test_execution_context_propagates_across_tool_calls(monkeypatch):
             "execution_context": context,
         },
     ]
+
+
 def test_run_conversation_creates_execution_context():
     fixed_time = datetime(2026, 11, 11, 14, 30, tzinfo=timezone.utc)
 
@@ -370,12 +390,8 @@ def test_run_conversation_creates_execution_context():
             return response
 
     with (
-        patch(
-            "agent.bedrock.execution_context.datetime"
-        ) as mock_datetime,
-        patch(
-            "agent.bedrock.converse_loop.handle_converse_response"
-        ) as mock_handler,
+        patch("agent.bedrock.execution_context.datetime") as mock_datetime,
+        patch("agent.bedrock.converse_loop.handle_converse_response") as mock_handler,
     ):
         mock_datetime.now.return_value = fixed_time
 
@@ -394,11 +410,10 @@ def test_run_conversation_creates_execution_context():
 
         execution_context = mock_handler.call_args.kwargs["execution_context"]
 
-        assert execution_context == {
-            "reference_timestamp": "2026-11-11T14:30:00Z"
-        }
+        assert execution_context == {"reference_timestamp": "2026-11-11T14:30:00Z"}
 
         mock_datetime.now.assert_called_once_with(timezone.utc)
+
 
 def test_run_conversation_normalizes_historical_execution_context():
     response = {
@@ -415,9 +430,7 @@ def test_run_conversation_normalizes_historical_execution_context():
         def converse(self, **kwargs):
             return response
 
-    with patch(
-        "agent.bedrock.converse_loop.handle_converse_response"
-    ) as mock_handler:
+    with patch("agent.bedrock.converse_loop.handle_converse_response") as mock_handler:
         mock_handler.return_value = {
             "status": "complete",
             "text": "Investigation complete.",
@@ -434,13 +447,10 @@ def test_run_conversation_normalizes_historical_execution_context():
 
         mock_handler.assert_called_once()
 
-        execution_context = mock_handler.call_args.kwargs[
-            "execution_context"
-        ]
+        execution_context = mock_handler.call_args.kwargs["execution_context"]
 
-        assert execution_context == {
-            "reference_timestamp": "2026-11-10T18:00:00Z"
-        }
+        assert execution_context == {"reference_timestamp": "2026-11-10T18:00:00Z"}
+
 
 def test_conversation_executes_maintenance_window_tool_with_trusted_timestamp():
     tool_request = {
@@ -520,3 +530,71 @@ def test_conversation_executes_maintenance_window_tool_with_trusted_timestamp():
         "available": False,
         "reason": "No upcoming maintenance window found",
     }
+
+def test_execution_trace_excludes_unrelated_tool_arguments():
+    response = tool_request()
+
+    tool_input = response["output"]["message"]["content"][0]["toolUse"]["input"]
+
+    tool_input["debug_notes"] = "Do not include in execution trace"
+    tool_input["internal_metadata"] = {
+        "source": "simulated",
+        "details": "Should not be recorded",
+    }
+
+    client = FakeBedrockClient(
+        [
+            response,
+            final_response(),
+        ]
+    )
+
+    result = run_conversation(
+        client,
+        "simulated-model",
+        "Investigate ALERT-0001",
+    )
+
+    assert result["status"] == "complete"
+
+    assert result["execution_trace"] == [
+        {
+            "model_call": 1,
+            "tool_name": "get_equipment_alert",
+            "status": "error",
+            "identifiers": {
+                "alert_id": "ALERT-0001",
+            },
+        }
+    ]
+
+def test_execution_trace_excludes_malformed_identifier():
+    response = tool_request()
+
+    tool_input = response["output"]["message"]["content"][0]["toolUse"]["input"]
+
+    tool_input["alert_id"] = 123
+
+    client = FakeBedrockClient(
+        [
+            response,
+            final_response(),
+        ]
+    )
+
+    result = run_conversation(
+        client,
+        "simulated-model",
+        "Investigate ALERT-0001",
+    )
+
+    assert result["status"] == "complete"
+
+    assert result["execution_trace"] == [
+        {
+            "model_call": 1,
+            "tool_name": "get_equipment_alert",
+            "status": "error",
+            "identifiers": {},
+        }
+    ]

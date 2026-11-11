@@ -79,11 +79,23 @@ def run_conversation(
         ]
 
         for tool_request, tool_result in zip(tool_requests, tool_results):
+            tool_input = tool_request.get("input", {})
+
+            identifiers = {}
+
+            if isinstance(tool_input, dict):
+                for field in ("alert_id", "asset_id"):
+                    value = tool_input.get(field)
+
+                    if isinstance(value, str) and value.strip():
+                        identifiers[field] = value
+
             execution_trace.append(
                 {
                     "model_call": model_call_number,
                     "tool_name": tool_request["name"],
                     "status": tool_result["toolResult"]["status"],
+                    "identifiers": identifiers,
                 }
             )
 

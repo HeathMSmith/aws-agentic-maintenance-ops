@@ -4,6 +4,7 @@ from agent.bedrock.converse_loop import run_conversation
 from agent.bedrock.policy_gate import evaluate_structured_action_proposal
 from agent.bedrock.proposal_generator import generate_action_proposal
 from agent.bedrock.evidence_completeness import validate_evidence_completeness
+from agent.bedrock.evidence_identity import validate_evidence_identity
 
 
 def run_investigation_workflow(
@@ -44,6 +45,18 @@ def run_investigation_workflow(
             "evidence_validation": evidence_validation,
             "investigation": investigation,
         }
+    identity_validation = validate_evidence_identity(
+        execution_trace=investigation.get("execution_trace"),
+        alert_id=alert_id,
+    )
+
+    if not identity_validation["valid"]:
+        return {
+            "status": "rejected",
+            "reason": "investigation evidence identity is invalid",
+            "identity_validation": identity_validation,
+            "investigation": investigation,
+        }
 
     proposal_result = generate_action_proposal(
         client=client,
@@ -67,9 +80,7 @@ def run_investigation_workflow(
 
     return {
         "status": (
-            "evaluated"
-            if policy_result["status"] == "evaluated"
-            else "rejected"
+            "evaluated" if policy_result["status"] == "evaluated" else "rejected"
         ),
         "investigation": investigation,
         "proposal": proposal_result["proposal"],
