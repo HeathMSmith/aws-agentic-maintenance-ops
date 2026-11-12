@@ -43,7 +43,6 @@ def make_proposal_response(
         },
     }
 
-
 def test_generate_valid_action_proposal():
     client = FakeClient(make_proposal_response())
 
@@ -70,6 +69,37 @@ def test_generate_valid_action_proposal():
     assert request["inferenceConfig"] == {"maxTokens": 1024}
 
 
+def test_proposal_prompt_includes_validated_operational_facts():
+    client = FakeClient(make_proposal_response())
+
+    operational_facts = {
+        "asset_id": "CONV-MTR-042",
+        "reference_timestamp": "2026-11-10T18:00:00Z",
+        "maintenance_window_available": False,
+    }
+
+    result = generate_action_proposal(
+        client=client,
+        model_id="test-model",
+        investigation_result={
+            "status": "complete",
+            "text": "Elevated vibration and temperature detected.",
+        },
+        alert_id="ALERT-0001",
+        operational_facts=operational_facts,
+    )
+
+    assert result["status"] == "proposed"
+    assert len(client.calls) == 1
+
+    prompt = client.calls[0]["messages"][0]["content"][0]["text"]
+
+    assert "2026-11-10T18:00:00Z" in prompt
+    assert "CONV-MTR-042" in prompt
+    assert "maintenance_window_available" in prompt
+    assert "false" in prompt.lower()
+
+
 @pytest.mark.parametrize(
     "investigation_result",
     [
@@ -80,6 +110,7 @@ def test_generate_valid_action_proposal():
         {"status": "failed"},
     ],
 )
+
 def test_incomplete_investigation_rejected(investigation_result):
     client = FakeClient(make_proposal_response())
 

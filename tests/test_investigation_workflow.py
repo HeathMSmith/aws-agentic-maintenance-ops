@@ -135,6 +135,12 @@ def test_workflow_requires_approval_for_shutdown_proposal():
     assert len(client.calls[1]["toolConfig"]["tools"]) == 5
     assert len(client.calls[2]["toolConfig"]["tools"]) == 1
 
+    proposal_prompt = client.calls[2]["messages"][0]["content"][0]["text"]
+    assert "Validated operational facts:" in proposal_prompt
+    assert '"asset_id": "CONV-MTR-042"' in proposal_prompt
+    assert '"reference_timestamp": "2026-11-10T18:00:00Z"' in proposal_prompt
+    assert '"maintenance_window_available": false' in proposal_prompt
+
 def test_workflow_rejects_incomplete_investigation():
     class FakeClient:
         def __init__(self):

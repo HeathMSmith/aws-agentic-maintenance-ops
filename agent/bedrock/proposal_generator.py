@@ -1,5 +1,7 @@
 """Generate structured maintenance-action proposals using Bedrock Converse."""
 
+import json
+
 from agent.bedrock.proposal_response import extract_action_proposal
 from agent.bedrock.proposal_tool_spec import PROPOSAL_TOOL_CONFIG
 
@@ -9,6 +11,7 @@ def generate_action_proposal(
     model_id: str,
     investigation_result: dict,
     alert_id: str,
+    operational_facts: dict | None = None,
 ) -> dict:
     """Request one structured proposal from a completed investigation."""
 
@@ -27,9 +30,21 @@ def generate_action_proposal(
             "reason": "alert_id must be a non-empty string",
         }
 
+    facts_section = ""
+
+    if operational_facts is not None:
+        facts_section = (
+            "\n\nValidated operational facts:\n"
+            f"{json.dumps(operational_facts, sort_keys=True)}\n"
+            "These scheduling facts were validated by the application. "
+            "Use them as authoritative for the investigation reference time. "
+            "Do not describe an unavailable maintenance window as upcoming."
+        )
+
     prompt = (
         f"Investigation for alert {alert_id}:\n\n"
-        f"{investigation_result.get('text', '')}\n\n"
+        f"{investigation_result.get('text', '')}"
+        f"{facts_section}\n\n"
         "Submit exactly one maintenance-action proposal using the "
         "provided tool. Base the proposal on the investigation evidence. "
         "Do not claim that maintenance or shutdown approval has been granted."

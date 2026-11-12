@@ -79,6 +79,7 @@ def run_investigation_workflow(
         model_id=model_id,
         investigation_result=investigation,
         alert_id=alert_id,
+        operational_facts=operational_facts_validation["facts"],
     )
 
     if proposal_result["status"] != "proposed":
