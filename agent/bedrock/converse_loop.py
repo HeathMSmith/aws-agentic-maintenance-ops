@@ -65,6 +65,7 @@ def run_conversation(
                 "status": "stopped",
                 "reason": result["reason"],
                 "execution_trace": execution_trace,
+                "evidence_records": evidence_records,
             }
 
         # Preserve the original assistant tool-use request.
@@ -144,4 +145,5 @@ def run_conversation(
         "status": "limit_reached",
         "reason": "maximum model calls reached",
         "execution_trace": execution_trace,
+        "evidence_records": evidence_records,
     }

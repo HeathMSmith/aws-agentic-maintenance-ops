@@ -121,6 +121,19 @@ def test_model_call_limit():
         max_model_calls=1,
     )
 
+    records = result["evidence_records"]
+
+    assert len(records) == 1
+    assert records[0]["tool_name"] == "get_equipment_alert"
+    assert records[0]["tool_use_id"] == "tool-001"
+    assert records[0]["identifiers"] == {
+        "alert_id": "ALERT-0001"
+    }
+    assert records[0]["result"] == get_equipment_alert(
+        "ALERT-0001"
+    )
+    assert len(records[0]["sha256"]) == 64
+
     assert result == {
         "status": "limit_reached",
         "reason": "maximum model calls reached",
@@ -134,6 +147,7 @@ def test_model_call_limit():
                 },
             }
         ],
+        "evidence_records": records,
     }
 
     assert len(client.calls) == 1
@@ -193,6 +207,7 @@ def test_unexpected_stop_reason():
         "status": "stopped",
         "reason": "max_tokens",
         "execution_trace": [],
+        "evidence_records": [],
     }
 
     assert len(client.calls) == 1
@@ -711,3 +726,45 @@ def test_successful_policy_tool_is_not_recorded_as_evidence(monkeypatch):
     assert trace[0]["status"] == "success"
 
     assert result["evidence_records"] == []
+
+def test_unexpected_stop_preserves_prior_evidence():
+    """Preserve validated evidence when a later model call stops."""
+
+    unexpected_response = {
+        "stopReason": "max_tokens",
+        "output": {
+            "message": {
+                "role": "assistant",
+                "content": [],
+            }
+        },
+    }
+
+    client = FakeBedrockClient(
+        [
+            tool_request(),
+            unexpected_response,
+        ]
+    )
+
+    result = run_conversation(
+        client,
+        "simulated-model",
+        "Investigate ALERT-0001",
+    )
+
+    assert result["status"] == "stopped"
+    assert result["reason"] == "max_tokens"
+
+    trace = result["execution_trace"]
+    records = result["evidence_records"]
+
+    assert len(trace) == 1
+    assert trace[0]["tool_name"] == "get_equipment_alert"
+    assert trace[0]["status"] == "success"
+
+    assert len(records) == 1
+    assert records[0]["tool_name"] == "get_equipment_alert"
+    assert records[0]["tool_use_id"] == "tool-001"
+    assert records[0]["result"] == get_equipment_alert("ALERT-0001")
+    assert len(records[0]["sha256"]) == 64

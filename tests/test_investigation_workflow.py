@@ -125,6 +125,9 @@ def test_workflow_rejects_incomplete_investigation():
         def converse(self, **kwargs):
             self.calls.append(kwargs)
 
+            if len(self.calls) == 1:
+                return make_evidence_tool_response()
+
             return {
                 "stopReason": "max_tokens",
                 "output": {
@@ -154,8 +157,28 @@ def test_workflow_rejects_incomplete_investigation():
     assert result["investigation"]["status"] == "stopped"
     assert result["investigation"]["reason"] == "max_tokens"
 
-    # No proposal-generation request should follow.
-    assert len(client.calls) == 1
+    investigation = result["investigation"]
+
+    trace = investigation["execution_trace"]
+    records = investigation["evidence_records"]
+
+    assert len(trace) == 5
+    assert all(entry["status"] == "success" for entry in trace)
+
+    assert len(records) == 5
+    assert all(len(record["sha256"]) == 64 for record in records)
+
+    # Two investigation calls; no proposal generation or policy evaluation.
+    assert len(client.calls) == 2
+
+    # Only investigation tools were available to the model.
+    assert all(
+        len(call["toolConfig"]["tools"]) == 6
+        for call in client.calls
+    )
+
+    assert "proposal" not in result
+    assert "policy_result" not in result
 
 def test_workflow_rejects_invalid_action_proposal():
     class FakeClient:
