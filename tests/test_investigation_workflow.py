@@ -113,8 +113,8 @@ def test_workflow_requires_approval_for_shutdown_proposal():
     assert policy["policy_decision"]["decision"] == "requires_approval"
 
     # The two Converse phases use separate tool configurations.
-    assert len(client.calls[0]["toolConfig"]["tools"]) == 6
-    assert len(client.calls[1]["toolConfig"]["tools"]) == 6
+    assert len(client.calls[0]["toolConfig"]["tools"]) == 5
+    assert len(client.calls[1]["toolConfig"]["tools"]) == 5
     assert len(client.calls[2]["toolConfig"]["tools"]) == 1
 
 def test_workflow_rejects_incomplete_investigation():
@@ -173,7 +173,7 @@ def test_workflow_rejects_incomplete_investigation():
 
     # Only investigation tools were available to the model.
     assert all(
-        len(call["toolConfig"]["tools"]) == 6
+        len(call["toolConfig"]["tools"]) == 5
         for call in client.calls
     )
 

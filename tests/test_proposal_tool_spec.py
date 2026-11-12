@@ -61,6 +61,6 @@ def test_proposal_tool_is_separate_from_investigation_tools():
         for tool in PROPOSAL_TOOL_CONFIG["tools"]
     }
 
-    assert len(investigation_names) == 6
+    assert len(investigation_names) == 5
     assert proposal_names == {PROPOSAL_TOOL_NAME}
     assert investigation_names.isdisjoint(proposal_names)
