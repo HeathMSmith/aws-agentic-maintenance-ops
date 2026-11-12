@@ -1,6 +1,8 @@
 import pytest
 
 from agent.bedrock.evidence_result import validate_evidence_result
+from agent.tools.equipment_alert import get_equipment_alert
+from agent.tools.asset_context import get_asset_context
 
 
 @pytest.mark.parametrize(
@@ -21,6 +23,12 @@ def test_accepts_matching_evidence_identifier(tool_name, identifier_field):
     )
 
     evidence = {identifier_field: identifier}
+
+    if tool_name == "get_equipment_alert":
+        evidence = get_equipment_alert(identifier)
+
+    if tool_name == "get_asset_context":
+        evidence = get_asset_context(identifier)
 
     if tool_name == "get_maintenance_history":
         evidence.update({
@@ -366,3 +374,283 @@ def test_rejects_malformed_maintenance_window(maintenance_window):
         "valid": False,
         "reason": "invalid maintenance window structure",
     }
+
+@pytest.mark.parametrize(
+    "field,invalid_value",
+    [
+        ("asset_id", ""),
+        ("asset_id", None),
+        ("alert_type", ""),
+        ("severity", None),
+        ("status", "   "),
+        ("timestamp", "invalid"),
+        ("timestamp", "2026-11-09T14:30:00"),
+        ("observations", {}),
+        ("observations", None),
+        ("baseline", {}),
+        ("baseline", None),
+    ],
+)
+def test_rejects_invalid_equipment_alert_fields(
+    field,
+    invalid_value,
+):
+    alert = get_equipment_alert("ALERT-0001").copy()
+    alert[field] = invalid_value
+
+    result = validate_evidence_result(
+        "get_equipment_alert",
+        {"alert_id": "ALERT-0001"},
+        alert,
+    )
+
+    assert result == {
+        "valid": False,
+        "reason": "invalid equipment alert structure",
+    }
+
+@pytest.mark.parametrize(
+    "measurement_value",
+    [
+        "high",
+        None,
+        True,
+        False,
+        [],
+        {},
+    ],
+)
+@pytest.mark.parametrize(
+    "field",
+    ["observations", "baseline"],
+)
+def test_rejects_invalid_equipment_measurements(
+    field,
+    measurement_value,
+):
+    alert = get_equipment_alert("ALERT-0001")
+    alert[field] = {
+        "temperature_c": measurement_value,
+    }
+
+    result = validate_evidence_result(
+        "get_equipment_alert",
+        {"alert_id": "ALERT-0001"},
+        alert,
+    )
+
+    assert result == {
+        "valid": False,
+        "reason": "invalid equipment alert measurements",
+    }
+
+@pytest.mark.parametrize(
+    "measurement_value",
+    [
+        float("nan"),
+        float("inf"),
+        float("-inf"),
+    ],
+)
+@pytest.mark.parametrize(
+    "field",
+    ["observations", "baseline"],
+)
+def test_rejects_nonfinite_equipment_measurements(
+    field,
+    measurement_value,
+):
+    alert = get_equipment_alert("ALERT-0001")
+
+    alert[field] = {
+        "temperature_c": measurement_value,
+    }
+
+    result = validate_evidence_result(
+        "get_equipment_alert",
+        {"alert_id": "ALERT-0001"},
+        alert,
+    )
+
+    assert result == {
+        "valid": False,
+        "reason": "invalid equipment alert measurements",
+    }
+
+@pytest.mark.parametrize(
+    "observations,baseline",
+    [
+        (
+            {
+                "vibration_rms_mm_s": 8.2,
+                "temperature_c": 89.0,
+            },
+            {
+                "vibration_rms_mm_s": 2.1,
+            },
+        ),
+        (
+            {
+                "vibration_rms_mm_s": 8.2,
+            },
+            {
+                "vibration_rms_mm_s": 2.1,
+                "temperature_c": 62.0,
+            },
+        ),
+        (
+            {
+                "temperature_c": 89.0,
+            },
+            {
+                "vibration_rms_mm_s": 2.1,
+            },
+        ),
+    ],
+)
+def test_rejects_mismatched_equipment_measurement_keys(
+    observations,
+    baseline,
+):
+    alert = get_equipment_alert("ALERT-0001")
+
+    alert["observations"] = observations
+    alert["baseline"] = baseline
+
+    result = validate_evidence_result(
+        "get_equipment_alert",
+        {"alert_id": "ALERT-0001"},
+        alert,
+    )
+
+    assert result == {
+        "valid": False,
+        "reason": "equipment alert measurement keys mismatch",
+    }
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "name",
+        "asset_type",
+        "location",
+        "criticality",
+        "operational_status",
+        "manufacturer",
+    ],
+)
+@pytest.mark.parametrize(
+    "invalid_value",
+    [
+        None,
+        "",
+        "   ",
+        123,
+    ],
+)
+def test_rejects_invalid_asset_context_fields(
+    field,
+    invalid_value,
+):
+    asset = get_asset_context("CONV-MTR-042").copy()
+    asset[field] = invalid_value
+
+    result = validate_evidence_result(
+        "get_asset_context",
+        {"asset_id": "CONV-MTR-042"},
+        asset,
+    )
+
+    assert result == {
+        "valid": False,
+        "reason": "invalid asset context structure",
+    }
+
+@pytest.mark.parametrize(
+    "criticality,expected_valid",
+    [
+        ("low", True),
+        ("medium", True),
+        ("high", True),
+        ("extremely_important", False),
+        ("critical", False),
+        ("HIGH", False),
+    ],
+)
+def test_asset_criticality_values(criticality, expected_valid):
+    asset = get_asset_context("CONV-MTR-042").copy()
+    asset["criticality"] = criticality
+
+    result = validate_evidence_result(
+        "get_asset_context",
+        {"asset_id": "CONV-MTR-042"},
+        asset,
+    )
+
+    assert result["valid"] is expected_valid
+
+    if not expected_valid:
+        assert result["reason"] == "invalid asset criticality"
+
+@pytest.mark.parametrize(
+    "rated_power,expected_valid",
+    [
+        (15, True),
+        (15.5, True),
+        (0, True),
+        (-1, False),
+        (float("nan"), False),
+        (float("inf"), False),
+        (float("-inf"), False),
+        (True, False),
+        (None, False),
+        ("15", False),
+    ],
+)
+def test_asset_rated_power_values(rated_power, expected_valid):
+    asset = get_asset_context("CONV-MTR-042").copy()
+    asset["rated_power_kw"] = rated_power
+
+    result = validate_evidence_result(
+        "get_asset_context",
+        {"asset_id": "CONV-MTR-042"},
+        asset,
+    )
+
+    assert result["valid"] is expected_valid
+
+    if not expected_valid:
+        assert result["reason"] == "invalid asset rated power"
+
+@pytest.mark.parametrize(
+    "maintenance_interval,expected_valid",
+    [
+        (1, True),
+        (90, True),
+        (365, True),
+        (0, False),
+        (-1, False),
+        (90.5, False),
+        (True, False),
+        (False, False),
+        (None, False),
+        ("90", False),
+    ],
+)
+def test_asset_maintenance_interval_values(
+    maintenance_interval,
+    expected_valid,
+):
+    asset = get_asset_context("CONV-MTR-042").copy()
+    asset["maintenance_interval_days"] = maintenance_interval
+
+    result = validate_evidence_result(
+        "get_asset_context",
+        {"asset_id": "CONV-MTR-042"},
+        asset,
+    )
+
+    assert result["valid"] is expected_valid
+
+    if not expected_valid:
+        assert result["reason"] == "invalid asset maintenance interval"

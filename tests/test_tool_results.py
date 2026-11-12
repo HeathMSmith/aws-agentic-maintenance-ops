@@ -1,6 +1,7 @@
 import pytest
 
 from agent.bedrock.tool_results import build_tool_result_message
+from agent.tools.asset_context import get_asset_context
 
 
 def make_tool_use(tool_name, tool_input):
@@ -84,7 +85,7 @@ def test_execution_context_forwarded_to_dispatcher(monkeypatch):
         captured["tool_input"] = tool_input
         captured["execution_context"] = execution_context
 
-        return {"asset_id": "CONV-MTR-042"}
+        return get_asset_context("CONV-MTR-042")
 
     monkeypatch.setattr(
         tool_results,
@@ -117,9 +118,9 @@ def test_execution_context_forwarded_to_dispatcher(monkeypatch):
 
     assert tool_result["toolUseId"] == "tool-001"
     assert tool_result["status"] == "success"
-    assert tool_result["content"][0]["json"] == {
-        "asset_id": "CONV-MTR-042",
-    }
+    assert tool_result["content"][0]["json"] == get_asset_context(
+        "CONV-MTR-042"
+    )
 
 def test_rejects_mismatched_evidence_result(monkeypatch):
     from agent.bedrock import tool_results
@@ -167,11 +168,7 @@ def test_rejects_mismatched_evidence_result(monkeypatch):
 def test_accepts_matching_evidence_result(monkeypatch):
     from agent.bedrock import tool_results
 
-    expected_evidence = {
-        "asset_id": "CONV-MTR-042",
-        "name": "Packaging Conveyor Motor 042",
-        "criticality": "high",
-    }
+    expected_evidence = get_asset_context("CONV-MTR-042")
 
     def fake_dispatch_tool(
         tool_name,
