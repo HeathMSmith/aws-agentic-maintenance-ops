@@ -2,6 +2,7 @@
 
 from agent.bedrock.tool_dispatcher import dispatch_tool
 from agent.bedrock.evidence_result import validate_evidence_result
+from agent.bedrock.tool_specs import TOOL_CONFIG
 
 
 def build_tool_result_message(
@@ -14,7 +15,24 @@ def build_tool_result_message(
     tool_name = tool_use["name"]
     tool_input = tool_use["input"]
 
-    result = dispatch_tool(tool_name, tool_input, execution_context)
+    allowed_tools = {
+        tool["toolSpec"]["name"]
+        for tool in TOOL_CONFIG["tools"]
+    }
+
+    if tool_name not in allowed_tools:
+        result = {
+            "error": "unsupported_tool",
+            "message": (
+                f"Tool '{tool_name}' is not allowed during investigation"
+            ),
+        }
+    else:
+        result = dispatch_tool(
+            tool_name,
+            tool_input,
+            execution_context,
+        )
 
     status = "error" if "error" in result else "success"
 

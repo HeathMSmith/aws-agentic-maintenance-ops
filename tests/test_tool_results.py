@@ -203,29 +203,19 @@ def test_accepts_matching_evidence_result(monkeypatch):
         }
     ]
 
-def test_policy_evaluation_bypasses_evidence_result_validation(monkeypatch):
+def test_policy_evaluation_rejected_before_dispatch(monkeypatch):
+    """Investigation must not execute model-requested policy evaluation."""
     from agent.bedrock import tool_results
 
-    expected_policy_result = {
-        "alert_id": "ALERT-0001",
-        "proposed_action": "request_equipment_shutdown",
-        "policy_decision": {
-            "decision": "requires_approval",
-        },
-    }
-
-    def fake_dispatch_tool(
-        tool_name,
-        tool_input,
-        execution_context=None,
-    ):
-        assert tool_name == "evaluate_proposed_maintenance_action"
-        return expected_policy_result
+    def forbidden_dispatch(*args, **kwargs):
+        raise AssertionError(
+            "Unauthorized policy tool must not be dispatched"
+        )
 
     monkeypatch.setattr(
         tool_results,
         "dispatch_tool",
-        fake_dispatch_tool,
+        forbidden_dispatch,
     )
 
     tool_use = {
@@ -238,13 +228,18 @@ def test_policy_evaluation_bypasses_evidence_result_validation(monkeypatch):
     }
 
     message = tool_results.build_tool_result_message(tool_use)
-
     result = message["content"][0]["toolResult"]
 
     assert result["toolUseId"] == "policy-001"
-    assert result["status"] == "success"
+    assert result["status"] == "error"
     assert result["content"] == [
         {
-            "json": expected_policy_result,
+            "json": {
+                "error": "unsupported_tool",
+                "message": (
+                    "Tool 'evaluate_proposed_maintenance_action' "
+                    "is not allowed during investigation"
+                ),
+            }
         }
     ]

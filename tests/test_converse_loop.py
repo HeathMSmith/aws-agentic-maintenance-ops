@@ -665,23 +665,20 @@ def test_failed_tool_result_is_not_recorded_as_evidence(monkeypatch):
 
     assert result["evidence_records"] == []
 
-def test_successful_policy_tool_is_not_recorded_as_evidence(monkeypatch):
-    """Successful policy evaluations must not become evidence records."""
+def test_unauthorized_policy_tool_is_rejected_and_not_recorded(monkeypatch):
+    """Unauthorized policy evaluations must be rejected and not recorded."""
 
     from agent.bedrock import tool_results
 
-    def fake_dispatch(tool_name, tool_input, execution_context=None):
-        assert tool_name == "evaluate_proposed_maintenance_action"
-
-        return {
-            "action": "request_equipment_shutdown",
-            "decision": "requires_approval",
-        }
+    def forbidden_dispatch(*args, **kwargs):
+        raise AssertionError(
+            "Unauthorized policy tool must not be dispatched"
+        )
 
     monkeypatch.setattr(
         tool_results,
         "dispatch_tool",
-        fake_dispatch,
+        forbidden_dispatch,
     )
 
     policy_tool_request = {
@@ -723,7 +720,7 @@ def test_successful_policy_tool_is_not_recorded_as_evidence(monkeypatch):
 
     assert len(trace) == 1
     assert trace[0]["tool_name"] == "evaluate_proposed_maintenance_action"
-    assert trace[0]["status"] == "success"
+    assert trace[0]["status"] == "error"
 
     assert result["evidence_records"] == []
 
