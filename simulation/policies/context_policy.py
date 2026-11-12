@@ -1,5 +1,6 @@
 from simulation.policies.maintenance_policy import evaluate_maintenance_action
 from simulation.policies.evidence_validation import validate_investigation_evidence
+from simulation.domain.asset import VALID_ASSET_CRITICALITIES
 
 
 def evaluate_action_with_context(action: str, investigation: dict) -> dict:
@@ -29,7 +30,7 @@ def evaluate_action_with_context(action: str, investigation: dict) -> dict:
             "reason": "invalid or missing alert severity",
         }
 
-    if criticality not in {"low", "medium", "high"}:
+    if criticality not in VALID_ASSET_CRITICALITIES:
         return {
             "decision": "rejected",
             "reason": "invalid or missing asset criticality",

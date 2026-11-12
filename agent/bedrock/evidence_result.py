@@ -4,6 +4,7 @@
 import math
 
 from simulation.clock import parse_simulation_time
+from simulation.domain.asset import VALID_ASSET_CRITICALITIES
 
 
 def _validate_equipment_alert(result: dict) -> dict:
@@ -88,7 +89,7 @@ def _validate_asset_context(result: dict) -> dict:
                 "reason": "invalid asset context structure",
             }
 
-    if result["criticality"] not in {"low", "medium", "high"}:
+    if result["criticality"] not in VALID_ASSET_CRITICALITIES:
         return {
             "valid": False,
             "reason": "invalid asset criticality",
