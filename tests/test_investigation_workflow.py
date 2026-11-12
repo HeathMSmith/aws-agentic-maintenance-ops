@@ -1,4 +1,5 @@
 from agent.bedrock.investigation_workflow import run_investigation_workflow
+from unittest.mock import patch
 
 def make_evidence_tool_response():
     """Simulate Bedrock requesting all five required evidence tools."""
@@ -103,6 +104,23 @@ def test_workflow_requires_approval_for_shutdown_proposal():
 
     assert result["status"] == "evaluated"
     assert len(client.calls) == 3
+
+    assert result["investigation"]["execution_context"] == {
+        "reference_timestamp": "2026-11-10T18:00:00Z",
+    }
+
+    window_records = [
+        record
+        for record in result["investigation"]["evidence_records"]
+        if record["tool_name"] == "get_maintenance_window_status"
+    ]
+
+    assert len(window_records) == 1
+    assert window_records[0]["result"]["asset_id"] == "CONV-MTR-042"
+    assert window_records[0]["result"]["reference_timestamp"] == (
+        "2026-11-10T18:00:00Z"
+    )
+    assert window_records[0]["result"]["maintenance_window"]["available"] is False
 
     assert result["proposal"]["alert_id"] == "ALERT-0001"
     assert result["proposal"]["proposed_action"] == "request_equipment_shutdown"
@@ -432,3 +450,62 @@ def test_workflow_rejects_mismatched_evidence_alert():
     ]
 
     assert len(client.calls) == 2
+
+
+def test_workflow_rejects_invalid_operational_facts():
+    """Reject invalid scheduling evidence before proposal generation."""
+
+    class FakeClient:
+        def __init__(self):
+            self.calls = []
+
+        def converse(self, **kwargs):
+            self.calls.append(kwargs)
+
+            if len(self.calls) == 1:
+                return make_evidence_tool_response()
+
+            if len(self.calls) == 2:
+                return {
+                    "stopReason": "end_turn",
+                    "output": {
+                        "message": {
+                            "role": "assistant",
+                            "content": [
+                                {"text": "Investigation complete."}
+                            ],
+                        }
+                    },
+                }
+
+            raise AssertionError(
+                "Proposal generation must not occur for invalid operational facts"
+            )
+
+    client = FakeClient()
+
+    with patch(
+        "agent.bedrock.investigation_workflow.extract_maintenance_window_facts"
+    ) as mock_facts:
+        mock_facts.return_value = {
+            "valid": False,
+            "reason": "maintenance-window timestamp mismatch",
+        }
+
+        result = run_investigation_workflow(
+            client=client,
+            model_id="test-model",
+            alert_id="ALERT-0001",
+            execution_context={
+                "reference_timestamp": "2026-11-10T18:00:00Z",
+            },
+        )
+
+    assert result["status"] == "rejected"
+    assert result["reason"] == "investigation operational facts are invalid"
+    assert result["operational_facts_validation"] == {
+        "valid": False,
+        "reason": "maintenance-window timestamp mismatch",
+    }
+    assert len(client.calls) == 2
+    mock_facts.assert_called_once()

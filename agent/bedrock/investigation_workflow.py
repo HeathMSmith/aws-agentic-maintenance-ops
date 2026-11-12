@@ -6,6 +6,7 @@ from agent.bedrock.proposal_generator import generate_action_proposal
 from agent.bedrock.evidence_completeness import validate_evidence_completeness
 from agent.bedrock.evidence_identity import validate_evidence_identity
 from agent.bedrock.investigation_prompt import build_investigation_prompt
+from agent.bedrock.operational_facts import extract_maintenance_window_facts
 
 
 def run_investigation_workflow(
@@ -56,6 +57,20 @@ def run_investigation_workflow(
             "status": "rejected",
             "reason": "investigation evidence identity is invalid",
             "identity_validation": identity_validation,
+            "investigation": investigation,
+        }
+
+    operational_facts_validation = extract_maintenance_window_facts(
+        evidence_records=investigation.get("evidence_records"),
+        expected_asset_id=identity_validation["asset_id"],
+        execution_context=investigation.get("execution_context"),
+    )
+
+    if not operational_facts_validation["valid"]:
+        return {
+            "status": "rejected",
+            "reason": "investigation operational facts are invalid",
+            "operational_facts_validation": operational_facts_validation,
             "investigation": investigation,
         }
 
