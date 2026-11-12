@@ -1,6 +1,9 @@
 
 """Regression tests for the offline maintenance investigation demo."""
 
+import hashlib
+import json
+
 from agent.bedrock.investigation_workflow import run_investigation_workflow
 from examples.offline_bedrock_client import OfflineBedrockClient
 
@@ -35,6 +38,30 @@ def test_offline_investigation_requires_approval():
     assert len(trace) == 5
     assert {entry["tool_name"] for entry in trace} == expected_tools
     assert all(entry["status"] == "success" for entry in trace)
+
+    records = result["investigation"]["evidence_records"]
+
+    assert len(records) == 5
+    assert {record["tool_name"] for record in records} == expected_tools
+
+    for record in records:
+        assert record["tool_use_id"]
+        assert record["identifiers"]
+        assert isinstance(record["result"], dict)
+        assert len(record["sha256"]) == 64
+
+        canonical_json = json.dumps(
+            record["result"],
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+
+        expected_digest = hashlib.sha256(
+            canonical_json.encode("utf-8")
+        ).hexdigest()
+
+        assert record["sha256"] == expected_digest
 
     assert result["proposal"]["alert_id"] == "ALERT-0001"
     assert (

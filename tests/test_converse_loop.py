@@ -6,6 +6,7 @@ from agent.bedrock import execution_context
 from agent.bedrock.converse_loop import run_conversation
 from datetime import datetime, timezone
 from unittest.mock import patch
+from agent.tools.equipment_alert import get_equipment_alert
 
 
 def tool_request():
@@ -64,6 +65,18 @@ def test_complete_tool_use_cycle():
         "Investigate ALERT-0001",
     )
 
+    evidence_records = result["evidence_records"]
+
+    assert len(evidence_records) == 1
+
+    record = evidence_records[0]
+
+    assert record["tool_name"] == "get_equipment_alert"
+    assert record["tool_use_id"] == "tool-001"
+    assert record["identifiers"] == {"alert_id": "ALERT-0001"}
+    assert record["result"] == get_equipment_alert("ALERT-0001")
+    assert len(record["sha256"]) == 64
+
     assert result == {
         "status": "complete",
         "text": "ALERT-0001 requires investigation.",
@@ -78,6 +91,7 @@ def test_complete_tool_use_cycle():
                 },
             }
         ],
+        "evidence_records": evidence_records,
     }
 
     assert len(client.calls) == 2
@@ -598,3 +612,102 @@ def test_execution_trace_excludes_malformed_identifier():
             "identifiers": {},
         }
     ]
+
+def test_failed_tool_result_is_not_recorded_as_evidence(monkeypatch):
+    """Failed evidence retrieval must not create a trusted record."""
+
+    from agent.bedrock import tool_results
+
+    def fake_dispatch(tool_name, tool_input, execution_context=None):
+        return {
+            "error": "simulated_failure",
+            "message": "Equipment alert retrieval failed",
+        }
+
+    monkeypatch.setattr(
+        tool_results,
+        "dispatch_tool",
+        fake_dispatch,
+    )
+
+    client = FakeBedrockClient(
+        [
+            tool_request(),
+            final_response(),
+        ]
+    )
+
+    result = run_conversation(
+        client,
+        "simulated-model",
+        "Investigate ALERT-0001",
+    )
+
+    assert result["status"] == "complete"
+
+    assert len(result["execution_trace"]) == 1
+    assert result["execution_trace"][0]["status"] == "error"
+
+    assert result["evidence_records"] == []
+
+def test_successful_policy_tool_is_not_recorded_as_evidence(monkeypatch):
+    """Successful policy evaluations must not become evidence records."""
+
+    from agent.bedrock import tool_results
+
+    def fake_dispatch(tool_name, tool_input, execution_context=None):
+        assert tool_name == "evaluate_proposed_maintenance_action"
+
+        return {
+            "action": "request_equipment_shutdown",
+            "decision": "requires_approval",
+        }
+
+    monkeypatch.setattr(
+        tool_results,
+        "dispatch_tool",
+        fake_dispatch,
+    )
+
+    policy_tool_request = {
+        "stopReason": "tool_use",
+        "output": {
+            "message": {
+                "role": "assistant",
+                "content": [
+                    {
+                        "toolUse": {
+                            "toolUseId": "policy-001",
+                            "name": "evaluate_proposed_maintenance_action",
+                            "input": {
+                                "proposed_action": "request_equipment_shutdown",
+                            },
+                        }
+                    }
+                ],
+            }
+        },
+    }
+
+    client = FakeBedrockClient(
+        [
+            policy_tool_request,
+            final_response(),
+        ]
+    )
+
+    result = run_conversation(
+        client,
+        "simulated-model",
+        "Evaluate the proposed maintenance action",
+    )
+
+    assert result["status"] == "complete"
+
+    trace = result["execution_trace"]
+
+    assert len(trace) == 1
+    assert trace[0]["tool_name"] == "evaluate_proposed_maintenance_action"
+    assert trace[0]["status"] == "success"
+
+    assert result["evidence_records"] == []

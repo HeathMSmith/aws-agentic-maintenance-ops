@@ -31,6 +31,7 @@ def main() -> None:
             {
                 "investigation": result["investigation"]["text"],
                 "execution_trace": result["investigation"]["execution_trace"],
+                "evidence_records": result["investigation"]["evidence_records"],
                 "proposal": result["proposal"],
                 "policy_decision": result["policy_result"]["policy_decision"],
             }

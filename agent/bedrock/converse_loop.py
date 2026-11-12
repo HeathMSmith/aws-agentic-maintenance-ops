@@ -3,6 +3,7 @@
 from agent.bedrock.execution_context import create_execution_context
 from agent.bedrock.response_handler import handle_converse_response
 from agent.bedrock.tool_specs import TOOL_CONFIG
+from agent.bedrock.evidence_record import build_evidence_record
 
 
 def run_conversation(
@@ -28,6 +29,7 @@ def run_conversation(
     ]
 
     execution_trace = []
+    evidence_records = []
 
     if execution_context is None:
         execution_context = create_execution_context()
@@ -55,6 +57,7 @@ def run_conversation(
                 "text": result["text"],
                 "model_calls": model_call_number,
                 "execution_trace": execution_trace,
+                "evidence_records": evidence_records,
             }
 
         if result["status"] == "unexpected_stop":
@@ -98,6 +101,30 @@ def run_conversation(
                     "identifiers": identifiers,
                 }
             )
+
+            evidence_tools = {
+                "get_equipment_alert",
+                "get_asset_context",
+                "get_maintenance_history",
+                "get_production_schedule",
+                "get_maintenance_window_status",
+            }
+
+            tool_name = tool_request["name"]
+            validated_result = tool_result["toolResult"]
+
+            if (
+                tool_name in evidence_tools
+                and validated_result["status"] == "success"
+            ):
+                evidence_records.append(
+                    build_evidence_record(
+                        tool_name=tool_name,
+                        tool_use_id=tool_request["toolUseId"],
+                        identifiers=identifiers,
+                        result=validated_result["content"][0]["json"],
+                    )
+                )
 
         if not tool_results:
             return {
