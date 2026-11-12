@@ -6,6 +6,7 @@ import json
 
 from agent.bedrock.investigation_workflow import run_investigation_workflow
 from examples.offline_bedrock_client import OfflineBedrockClient
+from examples.run_offline_investigation import main
 
 
 def test_offline_investigation_requires_approval():
@@ -79,3 +80,24 @@ def test_offline_investigation_requires_approval():
 
     assert policy["status"] == "evaluated"
     assert policy["policy_decision"]["decision"] == "requires_approval"
+
+
+def test_offline_investigation_output_identifies_unverified_explanation(capsys):
+    """Expose validated scheduling facts separately from model-generated text."""
+
+    main()
+
+    output = json.loads(capsys.readouterr().out)
+
+    assert output["workflow_status"] == "evaluated"
+
+    assert output["operational_facts"] == {
+        "asset_id": "CONV-MTR-042",
+        "reference_timestamp": "2026-11-10T18:00:00Z",
+        "maintenance_window_available": False,
+    }
+
+    assert output["proposal_reason_status"] == "model_generated_unverified"
+
+    assert output["proposal"]["proposed_action"] == "request_equipment_shutdown"
+    assert output["policy_decision"]["decision"] == "requires_approval"

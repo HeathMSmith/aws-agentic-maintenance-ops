@@ -104,7 +104,13 @@ def test_workflow_requires_approval_for_shutdown_proposal():
 
     assert result["status"] == "evaluated"
     assert len(client.calls) == 3
+    assert result["operational_facts"] == {
+        "asset_id": "CONV-MTR-042",
+        "reference_timestamp": "2026-11-10T18:00:00Z",
+        "maintenance_window_available": False,
+    }
 
+    assert result["proposal_reason_status"] == "model_generated_unverified"
     assert result["investigation"]["execution_context"] == {
         "reference_timestamp": "2026-11-10T18:00:00Z",
     }

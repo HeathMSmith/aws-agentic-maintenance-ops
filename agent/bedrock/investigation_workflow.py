@@ -100,6 +100,8 @@ def run_investigation_workflow(
             "evaluated" if policy_result["status"] == "evaluated" else "rejected"
         ),
         "investigation": investigation,
+        "operational_facts": operational_facts_validation["facts"],
         "proposal": proposal_result["proposal"],
+        "proposal_reason_status": "model_generated_unverified",
         "policy_result": policy_result,
     }

@@ -32,7 +32,9 @@ def main() -> None:
                 "investigation": result["investigation"]["text"],
                 "execution_trace": result["investigation"]["execution_trace"],
                 "evidence_records": result["investigation"]["evidence_records"],
+                "operational_facts": result["operational_facts"],
                 "proposal": result["proposal"],
+                "proposal_reason_status": result["proposal_reason_status"],
                 "policy_decision": result["policy_result"]["policy_decision"],
             }
         )
