@@ -77,10 +77,17 @@ def test_complete_tool_use_cycle():
     assert record["result"] == get_equipment_alert("ALERT-0001")
     assert len(record["sha256"]) == 64
 
+    execution_context = result["execution_context"]
+
+    assert isinstance(execution_context, dict)
+    assert isinstance(execution_context["reference_timestamp"], str)
+    assert execution_context["reference_timestamp"].endswith("Z")
+
     assert result == {
         "status": "complete",
         "text": "ALERT-0001 requires investigation.",
         "model_calls": 2,
+        "execution_context": execution_context,
         "execution_trace": [
             {
                 "model_call": 1,
@@ -465,7 +472,7 @@ def test_run_conversation_normalizes_historical_execution_context():
             "text": "Investigation complete.",
         }
 
-        run_conversation(
+        result = run_conversation(
             client=FakeClient(),
             model_id="test-model",
             prompt="Investigate the historical equipment alert.",
@@ -473,6 +480,11 @@ def test_run_conversation_normalizes_historical_execution_context():
                 "reference_timestamp": "2026-11-10T13:00:00-05:00",
             },
         )
+
+        assert result["status"] == "complete"
+        assert result["execution_context"] == {
+            "reference_timestamp": "2026-11-10T18:00:00Z",
+        }
 
         mock_handler.assert_called_once()
 

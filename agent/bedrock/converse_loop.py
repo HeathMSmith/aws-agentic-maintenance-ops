@@ -56,6 +56,7 @@ def run_conversation(
                 "status": "complete",
                 "text": result["text"],
                 "model_calls": model_call_number,
+                "execution_context": execution_context,
                 "execution_trace": execution_trace,
                 "evidence_records": evidence_records,
             }
