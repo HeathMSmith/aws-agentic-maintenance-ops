@@ -4,6 +4,8 @@
 import hashlib
 import json
 
+from pytest import CaptureFixture
+
 from agent.bedrock.investigation_workflow import run_investigation_workflow
 from examples.offline_bedrock_client import OfflineBedrockClient
 from examples.run_offline_investigation import main
@@ -82,7 +84,7 @@ def test_offline_investigation_requires_approval():
     assert policy["policy_decision"]["decision"] == "requires_approval"
 
 
-def test_offline_investigation_output_identifies_unverified_explanation(capsys):
+def test_offline_investigation_output_identifies_unverified_explanation(capsys: CaptureFixture[str]):
     """Expose validated scheduling facts separately from model-generated text."""
 
     main()
@@ -96,7 +98,15 @@ def test_offline_investigation_output_identifies_unverified_explanation(capsys):
         "reference_timestamp": "2026-11-10T18:00:00Z",
         "maintenance_window_available": False,
     }
-
+    assert output["maintenance_window_assessment"] == {
+        "available": False,
+        "reference_timestamp": "2026-11-10T18:00:00Z",
+        "summary": (
+            "No active or upcoming maintenance window was found "
+            "in the recorded production schedule at the investigation "
+            "reference time."
+        ),
+    }
     assert output["proposal_reason_status"] == "model_generated_unverified"
 
     assert output["proposal"]["proposed_action"] == "request_equipment_shutdown"

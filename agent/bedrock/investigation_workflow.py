@@ -7,6 +7,9 @@ from agent.bedrock.evidence_completeness import validate_evidence_completeness
 from agent.bedrock.evidence_identity import validate_evidence_identity
 from agent.bedrock.investigation_prompt import build_investigation_prompt
 from agent.bedrock.operational_facts import extract_maintenance_window_facts
+from agent.bedrock.maintenance_window_assessment import (
+    build_maintenance_window_assessment,
+)
 
 
 def run_investigation_workflow(
@@ -101,6 +104,9 @@ def run_investigation_workflow(
         ),
         "investigation": investigation,
         "operational_facts": operational_facts_validation["facts"],
+        "maintenance_window_assessment": build_maintenance_window_assessment(
+            operational_facts_validation["facts"]
+        ),
         "proposal": proposal_result["proposal"],
         "proposal_reason_status": "model_generated_unverified",
         "policy_result": policy_result,

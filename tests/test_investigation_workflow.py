@@ -111,6 +111,15 @@ def test_workflow_requires_approval_for_shutdown_proposal():
     }
 
     assert result["proposal_reason_status"] == "model_generated_unverified"
+    assert result["maintenance_window_assessment"] == {
+        "available": False,
+        "reference_timestamp": "2026-11-10T18:00:00Z",
+        "summary": (
+            "No active or upcoming maintenance window was found "
+            "in the recorded production schedule at the investigation "
+            "reference time."
+        ),
+    }
     assert result["investigation"]["execution_context"] == {
         "reference_timestamp": "2026-11-10T18:00:00Z",
     }
