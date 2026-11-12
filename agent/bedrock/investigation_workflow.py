@@ -5,6 +5,7 @@ from agent.bedrock.policy_gate import evaluate_structured_action_proposal
 from agent.bedrock.proposal_generator import generate_action_proposal
 from agent.bedrock.evidence_completeness import validate_evidence_completeness
 from agent.bedrock.evidence_identity import validate_evidence_identity
+from agent.bedrock.investigation_prompt import build_investigation_prompt
 
 
 def run_investigation_workflow(
@@ -24,7 +25,7 @@ def run_investigation_workflow(
     investigation = run_conversation(
         client=client,
         model_id=model_id,
-        prompt=f"Investigate equipment alert {alert_id}.",
+        prompt=build_investigation_prompt(alert_id),
         execution_context=execution_context,
     )
 
