@@ -50,8 +50,14 @@ def test_offline_investigation_requires_approval():
         assert isinstance(record["result"], dict)
         assert len(record["sha256"]) == 64
 
+        record_content = {
+            key: value
+            for key, value in record.items()
+            if key != "sha256"
+        }
+
         canonical_json = json.dumps(
-            record["result"],
+            record_content,
             sort_keys=True,
             separators=(",", ":"),
             allow_nan=False,

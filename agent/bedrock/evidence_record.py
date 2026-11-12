@@ -12,11 +12,15 @@ def build_evidence_record(
     result: dict,
 ) -> dict:
     """Create an evidence record with a deterministic content digest."""
-
-    evidence = copy.deepcopy(result)
+    record = {
+        "tool_name": tool_name,
+        "tool_use_id": tool_use_id,
+        "identifiers": copy.deepcopy(identifiers),
+        "result": copy.deepcopy(result),
+    }
 
     canonical_json = json.dumps(
-        evidence,
+        record,
         sort_keys=True,
         separators=(",", ":"),
         allow_nan=False,
@@ -27,9 +31,6 @@ def build_evidence_record(
     ).hexdigest()
 
     return {
-        "tool_name": tool_name,
-        "tool_use_id": tool_use_id,
-        "identifiers": copy.deepcopy(identifiers),
-        "result": evidence,
+        **record,
         "sha256": digest,
     }
