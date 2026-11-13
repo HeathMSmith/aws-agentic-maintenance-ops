@@ -109,8 +109,15 @@ def test_workflow_requires_approval_for_shutdown_proposal():
         "reference_timestamp": "2026-11-10T18:00:00Z",
         "maintenance_window_available": False,
     }
-
     assert result["proposal_reason_status"] == "model_generated_unverified"
+    assert result["authorization_assessment"] == {
+        "action": "request_equipment_shutdown",
+        "decision": "requires_approval",
+        "summary": (
+            "The proposed equipment shutdown requires approval "
+            "before execution."
+        ),
+    }
     assert result["maintenance_window_assessment"] == {
         "available": False,
         "reference_timestamp": "2026-11-10T18:00:00Z",
@@ -354,6 +361,7 @@ def test_workflow_rejects_mismatched_proposal_alert():
         "status": "rejected",
         "reason": "proposal alert_id does not match the requested incident",
     }
+    assert result["authorization_assessment"] is None
 
     assert result["proposal"]["alert_id"] == "ALERT-9999"
     assert len(client.calls) == 3

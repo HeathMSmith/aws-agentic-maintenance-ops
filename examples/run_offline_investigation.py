@@ -36,6 +36,7 @@ def main() -> None:
                 "maintenance_window_assessment": result["maintenance_window_assessment"],
                 "proposal": result["proposal"],
                 "proposal_reason_status": result["proposal_reason_status"],
+                "authorization_assessment": result["authorization_assessment"],
                 "policy_decision": result["policy_result"]["policy_decision"],
             }
         )

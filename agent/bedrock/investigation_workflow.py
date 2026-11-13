@@ -10,6 +10,9 @@ from agent.bedrock.operational_facts import extract_maintenance_window_facts
 from agent.bedrock.maintenance_window_assessment import (
     build_maintenance_window_assessment,
 )
+from agent.bedrock.authorization_assessment import (
+    build_authorization_assessment,
+)
 
 
 def run_investigation_workflow(
@@ -97,6 +100,12 @@ def run_investigation_workflow(
         expected_alert_id=alert_id,
         proposal=proposal_result["proposal"],
     )
+    authorization_assessment = None
+
+    if policy_result["status"] == "evaluated":
+        authorization_assessment = build_authorization_assessment(
+            policy_result
+        )
 
     return {
         "status": (
@@ -110,4 +119,5 @@ def run_investigation_workflow(
         "proposal": proposal_result["proposal"],
         "proposal_reason_status": "model_generated_unverified",
         "policy_result": policy_result,
+        "authorization_assessment": authorization_assessment,
     }

@@ -108,6 +108,13 @@ def test_offline_investigation_output_identifies_unverified_explanation(capsys: 
         ),
     }
     assert output["proposal_reason_status"] == "model_generated_unverified"
-
+    assert output["authorization_assessment"] == {
+        "action": "request_equipment_shutdown",
+        "decision": "requires_approval",
+        "summary": (
+            "The proposed equipment shutdown requires approval "
+            "before execution."
+        ),
+    }
     assert output["proposal"]["proposed_action"] == "request_equipment_shutdown"
     assert output["policy_decision"]["decision"] == "requires_approval"
