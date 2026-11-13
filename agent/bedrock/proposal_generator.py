@@ -1,9 +1,12 @@
 """Generate structured maintenance-action proposals using Bedrock Converse."""
 
 import json
+import logging
 
 from agent.bedrock.proposal_response import extract_action_proposal
 from agent.bedrock.proposal_tool_spec import PROPOSAL_TOOL_CONFIG
+
+logger = logging.getLogger(__name__)
 
 
 def generate_action_proposal(
@@ -50,16 +53,25 @@ def generate_action_proposal(
         "Do not claim that maintenance or shutdown approval has been granted."
     )
 
-    response = client.converse(
-        modelId=model_id,
-        messages=[
-            {
-                "role": "user",
-                "content": [{"text": prompt}],
-            }
-        ],
-        toolConfig=PROPOSAL_TOOL_CONFIG,
-        inferenceConfig={"maxTokens": 1024},
-    )
+    try:
+        response = client.converse(
+            modelId=model_id,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [{"text": prompt}],
+                }
+            ],
+            toolConfig=PROPOSAL_TOOL_CONFIG,
+            inferenceConfig={"maxTokens": 1024},
+        )
+    except Exception:
+        logger.exception(
+            "Bedrock Converse request failed during maintenance proposal generation"
+        )
+        return {
+            "status": "rejected",
+            "reason": "bedrock_request_failed",
+        }
 
     return extract_action_proposal(response)

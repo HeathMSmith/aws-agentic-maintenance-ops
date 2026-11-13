@@ -227,3 +227,25 @@ def test_malformed_bedrock_response_rejected():
         "status": "rejected",
         "reason": "invalid proposal response structure",
     }
+
+def test_bedrock_exception_rejects_action_proposal():
+    """A Bedrock request failure must not produce a maintenance proposal."""
+
+    class FailingClient:
+        def converse(self, **kwargs):
+            raise RuntimeError("simulated Bedrock service failure")
+
+    result = generate_action_proposal(
+        client=FailingClient(),
+        model_id="simulated-model",
+        investigation_result={
+            "status": "complete",
+            "text": "Equipment anomaly investigation completed.",
+        },
+        alert_id="ALERT-0001",
+    )
+
+    assert result == {
+        "status": "rejected",
+        "reason": "bedrock_request_failed",
+    }

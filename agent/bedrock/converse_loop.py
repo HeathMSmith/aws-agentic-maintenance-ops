@@ -1,10 +1,13 @@
 """Coordinate a bounded Bedrock Converse tool-use workflow."""
 
+import logging
+
 from agent.bedrock.execution_context import create_execution_context
 from agent.bedrock.response_handler import handle_converse_response
 from agent.bedrock.tool_specs import TOOL_CONFIG
 from agent.bedrock.evidence_record import build_evidence_record
 
+logger = logging.getLogger(__name__)
 
 def run_conversation(
     client,
@@ -39,17 +42,99 @@ def run_conversation(
     )
 
     for model_call_number in range(1, max_model_calls + 1):
-        response = client.converse(
-            modelId=model_id,
-            messages=messages,
-            toolConfig=TOOL_CONFIG,
-            inferenceConfig={"maxTokens": 2048},
-        )
+        try:
+            response = client.converse(
+                modelId=model_id,
+                messages=messages,
+                toolConfig=TOOL_CONFIG,
+                inferenceConfig={"maxTokens": 2048},
+            )
+        except Exception:
+            logger.exception(
+                "Bedrock Converse request failed on model call %s",
+                model_call_number,
+            )
+            return {
+                "status": "stopped",
+                "reason": "bedrock_request_failed",
+                "execution_trace": execution_trace,
+                "evidence_records": evidence_records,
+            }
+        if (
+            not isinstance(response, dict)
+            or not isinstance(response.get("stopReason"), str)
+            or not isinstance(response.get("output"), dict)
+            or not isinstance(response["output"].get("message"), dict)
+            or not isinstance(
+                response["output"]["message"].get("content"), list
+            )
+            or any(
+                not isinstance(block, dict)
+                for block in response["output"]["message"]["content"]
+            )
 
-        result = handle_converse_response(
-            response,
-            execution_context=execution_context,
-        )
+        ):
+            logger.error(
+                "Invalid Bedrock Converse response structure "
+                "on model call %s",
+                model_call_number,
+            )
+            return {
+                "status": "stopped",
+                "reason": "invalid_model_response",
+                "execution_trace": execution_trace,
+                "evidence_records": evidence_records,
+            }
+        if response["stopReason"] == "tool_use":
+            content_blocks = response["output"]["message"]["content"]
+
+            tool_requests = [
+                block.get("toolUse")
+                for block in content_blocks
+                if isinstance(block, dict) and "toolUse" in block
+            ]
+
+            invalid_tool_request = (
+                not tool_requests
+                or any(
+                    not isinstance(tool_request, dict)
+                    or not isinstance(tool_request.get("toolUseId"), str)
+                    or not tool_request["toolUseId"].strip()
+                    or not isinstance(tool_request.get("name"), str)
+                    or not tool_request["name"].strip()
+                    or not isinstance(tool_request.get("input"), dict)
+                    for tool_request in tool_requests
+                )
+            )
+
+            if invalid_tool_request:
+                logger.error(
+                    "Invalid Bedrock tool-use request on model call %s",
+                    model_call_number,
+                )
+                return {
+                    "status": "stopped",
+                    "reason": "invalid_model_response",
+                    "execution_trace": execution_trace,
+                    "evidence_records": evidence_records,
+                }
+
+        try:
+            result = handle_converse_response(
+                response,
+                execution_context=execution_context,
+            )
+        except Exception:
+            logger.exception(
+                "Converse response processing failed on model call %s",
+                model_call_number,
+            )
+            return {
+                "status": "stopped",
+                "reason": "tool_execution_failed",
+                "execution_trace": execution_trace,
+                "evidence_records": evidence_records,
+            }
 
         if result["status"] == "complete":
             return {

@@ -227,7 +227,20 @@ def test_workflow_rejects_incomplete_investigation():
     assert "proposal" not in result
     assert "policy_result" not in result
 
-def test_workflow_rejects_invalid_action_proposal():
+def test_workflow_rejects_invalid_action_proposal(monkeypatch):
+
+    from agent.bedrock import investigation_workflow
+
+    def forbidden_policy_evaluation(*args, **kwargs):
+        raise AssertionError(
+            "Policy evaluation must not run for a rejected proposal"
+        )
+
+    monkeypatch.setattr(
+        investigation_workflow,
+        "evaluate_structured_action_proposal",
+        forbidden_policy_evaluation,
+    )
     class FakeClient:
         def __init__(self):
             self.calls = []
@@ -539,3 +552,67 @@ def test_workflow_rejects_invalid_operational_facts():
     }
     assert len(client.calls) == 2
     mock_facts.assert_called_once()
+
+def test_workflow_rejects_bedrock_proposal_failure(monkeypatch):
+    """A proposal-stage Bedrock failure must prevent policy evaluation."""
+
+    from agent.bedrock import investigation_workflow
+
+    def forbidden_policy_evaluation(*args, **kwargs):
+        raise AssertionError(
+            "Policy evaluation must not run after proposal failure"
+        )
+
+    monkeypatch.setattr(
+        investigation_workflow,
+        "evaluate_structured_action_proposal",
+        forbidden_policy_evaluation,
+    )
+
+    class FailingProposalClient:
+        def __init__(self):
+            self.calls = 0
+
+        def converse(self, **kwargs):
+            self.calls += 1
+
+            if self.calls == 1:
+                return make_evidence_tool_response()
+
+            if self.calls == 2:
+                return {
+                    "stopReason": "end_turn",
+                    "output": {
+                        "message": {
+                            "role": "assistant",
+                            "content": [
+                                {"text": "Investigation complete."}
+                            ],
+                        }
+                    },
+                }
+
+            raise RuntimeError("simulated proposal-stage Bedrock failure")
+
+    client = FailingProposalClient()
+
+    result = run_investigation_workflow(
+        client=client,
+        model_id="test-model",
+        alert_id="ALERT-0001",
+        execution_context={
+            "reference_timestamp": "2026-11-10T18:00:00Z",
+        },
+    )
+
+    assert client.calls == 3
+    assert result["status"] == "rejected"
+    assert result["reason"] == (
+        "valid structured action proposal was not received"
+    )
+    assert result["proposal_result"] == {
+        "status": "rejected",
+        "reason": "bedrock_request_failed",
+    }
+    assert "policy_result" not in result
+    assert "authorization_assessment" not in result

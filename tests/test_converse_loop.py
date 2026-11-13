@@ -777,3 +777,333 @@ def test_unexpected_stop_preserves_prior_evidence():
     assert records[0]["tool_use_id"] == "tool-001"
     assert records[0]["result"] == get_equipment_alert("ALERT-0001")
     assert len(records[0]["sha256"]) == 64
+
+def test_bedrock_exception_stops_conversation():
+    """A Bedrock client failure must terminate the investigation."""
+
+    class FailingClient:
+        def converse(self, **kwargs):
+            raise RuntimeError("simulated Bedrock service failure")
+
+    result = run_conversation(
+        client=FailingClient(),
+        model_id="simulated-model",
+        prompt="Investigate ALERT-0001",
+    )
+
+    assert result == {
+        "status": "stopped",
+        "reason": "bedrock_request_failed",
+        "execution_trace": [],
+        "evidence_records": [],
+    }
+
+
+def test_bedrock_exception_preserves_prior_evidence():
+    """Preserve collected evidence when a later Bedrock request fails."""
+
+    class FailingSecondCallClient:
+        def __init__(self):
+            self.calls = 0
+
+        def converse(self, **kwargs):
+            self.calls += 1
+
+            if self.calls == 1:
+                return tool_request()
+
+            raise RuntimeError("simulated Bedrock service failure")
+
+    client = FailingSecondCallClient()
+
+    result = run_conversation(
+        client=client,
+        model_id="simulated-model",
+        prompt="Investigate ALERT-0001",
+    )
+
+    assert result["status"] == "stopped"
+    assert result["reason"] == "bedrock_request_failed"
+    assert client.calls == 2
+
+    assert len(result["execution_trace"]) == 1
+    assert result["execution_trace"][0]["tool_name"] == "get_equipment_alert"
+    assert result["execution_trace"][0]["status"] == "success"
+
+    assert len(result["evidence_records"]) == 1
+    assert result["evidence_records"][0]["tool_name"] == "get_equipment_alert"
+    assert result["evidence_records"][0]["result"] == get_equipment_alert(
+        "ALERT-0001"
+    )
+
+
+def test_tool_execution_exception_stops_conversation(monkeypatch):
+    """Unexpected evidence-tool exceptions must stop the conversation."""
+
+    from agent.bedrock import tool_results
+
+    def failing_dispatch(tool_name, tool_input, execution_context=None):
+        raise RuntimeError("simulated evidence retrieval failure")
+
+    monkeypatch.setattr(
+        tool_results,
+        "dispatch_tool",
+        failing_dispatch,
+    )
+
+    client = FakeBedrockClient([tool_request()])
+
+    result = run_conversation(
+        client=client,
+        model_id="simulated-model",
+        prompt="Investigate ALERT-0001",
+    )
+
+    assert result == {
+        "status": "stopped",
+        "reason": "tool_execution_failed",
+        "execution_trace": [],
+        "evidence_records": [],
+    }
+
+
+def test_malformed_converse_response_stops_conversation():
+    """Malformed Bedrock responses must terminate without authorization."""
+
+    client = FakeBedrockClient(
+        [
+            {
+                "output": {
+                    "message": {
+                        "role": "assistant",
+                        "content": [{"text": "Investigation complete."}],
+                    }
+                }
+            }
+        ]
+    )
+
+    result = run_conversation(
+        client=client,
+        model_id="simulated-model",
+        prompt="Investigate ALERT-0001",
+    )
+
+    assert result == {
+        "status": "stopped",
+        "reason": "invalid_model_response",
+        "execution_trace": [],
+        "evidence_records": [],
+    }
+
+def test_missing_output_message_stops_conversation():
+    """Missing assistant message must produce an invalid-response failure."""
+
+    client = FakeBedrockClient(
+        [
+            {
+                "stopReason": "end_turn",
+                "output": {},
+            }
+        ]
+    )
+
+    result = run_conversation(
+        client=client,
+        model_id="simulated-model",
+        prompt="Investigate ALERT-0001",
+    )
+
+    assert result == {
+        "status": "stopped",
+        "reason": "invalid_model_response",
+        "execution_trace": [],
+        "evidence_records": [],
+    }
+
+def test_missing_tool_use_id_stops_conversation():
+    """A tool request without toolUseId must be rejected before dispatch."""
+
+    client = FakeBedrockClient(
+        [
+            {
+                "stopReason": "tool_use",
+                "output": {
+                    "message": {
+                        "role": "assistant",
+                        "content": [
+                            {
+                                "toolUse": {
+                                    "name": "get_equipment_alert",
+                                    "input": {"alert_id": "ALERT-0001"},
+                                }
+                            }
+                        ],
+                    }
+                },
+            }
+        ]
+    )
+
+    result = run_conversation(
+        client=client,
+        model_id="simulated-model",
+        prompt="Investigate ALERT-0001",
+    )
+
+    assert result == {
+        "status": "stopped",
+        "reason": "invalid_model_response",
+        "execution_trace": [],
+        "evidence_records": [],
+    }
+
+@pytest.mark.parametrize(
+    "invalid_tool_use",
+    [
+        {"toolUseId": "tool-001", "input": {"alert_id": "ALERT-0001"}},
+        {"toolUseId": "tool-001", "name": "get_equipment_alert"},
+        {
+            "toolUseId": "tool-001",
+            "name": "get_equipment_alert",
+            "input": "ALERT-0001",
+        },
+        {
+            "toolUseId": "",
+            "name": "get_equipment_alert",
+            "input": {"alert_id": "ALERT-0001"},
+        },
+        {
+            "toolUseId": "tool-001",
+            "name": "",
+            "input": {"alert_id": "ALERT-0001"},
+        },
+    ],
+)
+def test_invalid_tool_use_fields_stop_conversation(invalid_tool_use):
+    """Malformed tool-use fields must be rejected before execution."""
+
+    client = FakeBedrockClient(
+        [
+            {
+                "stopReason": "tool_use",
+                "output": {
+                    "message": {
+                        "role": "assistant",
+                        "content": [{"toolUse": invalid_tool_use}],
+                    }
+                },
+            }
+        ]
+    )
+
+    result = run_conversation(
+        client=client,
+        model_id="simulated-model",
+        prompt="Investigate ALERT-0001",
+    )
+
+    assert result == {
+        "status": "stopped",
+        "reason": "invalid_model_response",
+        "execution_trace": [],
+        "evidence_records": [],
+    }
+
+def test_invalid_multi_tool_batch_rejected_before_dispatch(monkeypatch):
+    """Reject the entire tool batch before executing any tool."""
+
+    from agent.bedrock import tool_results
+
+    dispatch_calls = []
+
+    def tracked_dispatch(tool_name, tool_input, execution_context=None):
+        dispatch_calls.append(tool_name)
+        raise AssertionError("No tools should be dispatched")
+
+    monkeypatch.setattr(
+        tool_results,
+        "dispatch_tool",
+        tracked_dispatch,
+    )
+
+    response = {
+        "stopReason": "tool_use",
+        "output": {
+            "message": {
+                "role": "assistant",
+                "content": [
+                    {
+                        "toolUse": {
+                            "toolUseId": "tool-001",
+                            "name": "get_equipment_alert",
+                            "input": {"alert_id": "ALERT-0001"},
+                        }
+                    },
+                    {
+                        "toolUse": {
+                            "name": "get_asset_context",
+                            "input": {"asset_id": "CONV-MTR-042"},
+                        }
+                    },
+                ],
+            }
+        },
+    }
+
+    client = FakeBedrockClient([response])
+
+    result = run_conversation(
+        client=client,
+        model_id="simulated-model",
+        prompt="Investigate ALERT-0001",
+    )
+
+    assert result == {
+        "status": "stopped",
+        "reason": "invalid_model_response",
+        "execution_trace": [],
+        "evidence_records": [],
+    }
+
+    assert dispatch_calls == []
+    assert len(client.calls) == 1
+
+@pytest.mark.parametrize(
+    "invalid_block",
+    [
+        None,
+        42,
+        "invalid-content-block",
+        [],
+    ],
+)
+def test_invalid_content_block_stops_conversation(invalid_block):
+    """Non-dictionary content blocks must be rejected."""
+
+    client = FakeBedrockClient(
+        [
+            {
+                "stopReason": "end_turn",
+                "output": {
+                    "message": {
+                        "role": "assistant",
+                        "content": [invalid_block],
+                    }
+                },
+            }
+        ]
+    )
+
+    result = run_conversation(
+        client=client,
+        model_id="simulated-model",
+        prompt="Investigate ALERT-0001",
+    )
+
+    assert result == {
+        "status": "stopped",
+        "reason": "invalid_model_response",
+        "execution_trace": [],
+        "evidence_records": [],
+    }
