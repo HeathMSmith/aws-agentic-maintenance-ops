@@ -39,6 +39,12 @@ def main() -> None:
                 "proposal_reason_status": result["proposal_reason_status"],
                 "authorization_assessment": result["authorization_assessment"],
                 "policy_decision": result["policy_result"]["policy_decision"],
+                "decision_summary": {
+                    "maintenance_window_assessment": result[
+                        "maintenance_window_assessment"
+                    ],
+                    "authorization_assessment": result["authorization_assessment"],
+                },
             }
         )
     else:

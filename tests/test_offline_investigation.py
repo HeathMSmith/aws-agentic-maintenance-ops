@@ -119,3 +119,15 @@ def test_offline_investigation_output_identifies_unverified_explanation(capsys: 
     }
     assert output["proposal"]["proposed_action"] == "request_equipment_shutdown"
     assert output["policy_decision"]["decision"] == "requires_approval"
+
+    assert output["decision_summary"] == {
+        "maintenance_window_assessment": output[
+            "maintenance_window_assessment"
+        ],
+        "authorization_assessment": output[
+            "authorization_assessment"
+        ],
+    }
+
+    assert "investigation" not in output["decision_summary"]
+    assert "proposal" not in output["decision_summary"]
