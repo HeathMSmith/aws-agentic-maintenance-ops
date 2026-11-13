@@ -107,6 +107,7 @@ def test_offline_investigation_output_identifies_unverified_explanation(capsys: 
             "reference time."
         ),
     }
+    assert output["investigation_text_status"] == "model_generated_unverified"
     assert output["proposal_reason_status"] == "model_generated_unverified"
     assert output["authorization_assessment"] == {
         "action": "request_equipment_shutdown",

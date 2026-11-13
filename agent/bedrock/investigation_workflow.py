@@ -112,6 +112,7 @@ def run_investigation_workflow(
             "evaluated" if policy_result["status"] == "evaluated" else "rejected"
         ),
         "investigation": investigation,
+        "investigation_text_status": "model_generated_unverified",
         "operational_facts": operational_facts_validation["facts"],
         "maintenance_window_assessment": build_maintenance_window_assessment(
             operational_facts_validation["facts"]

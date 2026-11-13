@@ -109,6 +109,7 @@ def test_workflow_requires_approval_for_shutdown_proposal():
         "reference_timestamp": "2026-11-10T18:00:00Z",
         "maintenance_window_available": False,
     }
+    assert result["investigation_text_status"] == "model_generated_unverified"
     assert result["proposal_reason_status"] == "model_generated_unverified"
     assert result["authorization_assessment"] == {
         "action": "request_equipment_shutdown",

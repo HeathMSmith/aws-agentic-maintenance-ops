@@ -30,6 +30,7 @@ def main() -> None:
         summary.update(
             {
                 "investigation": result["investigation"]["text"],
+                "investigation_text_status": result["investigation_text_status"],
                 "execution_trace": result["investigation"]["execution_trace"],
                 "evidence_records": result["investigation"]["evidence_records"],
                 "operational_facts": result["operational_facts"],
