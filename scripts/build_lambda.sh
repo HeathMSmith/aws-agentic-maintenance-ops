@@ -37,6 +37,11 @@ cp -R "$REPO_ROOT/data" "$STAGING_DIR/"
 find "$STAGING_DIR" -type d -name '__pycache__' -prune -exec rm -rf {} +
 find "$STAGING_DIR" -type f -name '*.pyc' -delete
 
+# Exclude installed command-line scripts and environment-specific pip records.
+# Lambda imports the Python packages directly and does not need these files.
+rm -rf "$STAGING_DIR/bin"
+find "$STAGING_DIR" -type f -name RECORD -path '*.dist-info/*' -delete
+
 # Normalize file and directory timestamps for reproducible ZIP archives.
 find "$STAGING_DIR" -exec touch -t 202001010000 {} +
 
