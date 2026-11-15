@@ -66,6 +66,7 @@
                 "iam:UntagRole",
                 "iam:ListRoleTags",
                 "iam:ListRolePolicies",
+                "iam:ListAttachedRolePolicies",
                 "iam:PutRolePolicy",
                 "iam:GetRolePolicy",
                 "iam:DeleteRolePolicy"
@@ -104,6 +105,7 @@
                 "logs:DeleteRetentionPolicy",
                 "logs:ListTagsForResource",
                 "logs:TagResource",
+                "logs:TagLogGroup",
                 "logs:UntagResource"
             ],
             "Resource": "arn:aws:logs:us-east-1:291634988692:log-group:/aws/lambda/agentic-maintenance-ops"
