@@ -46,6 +46,7 @@
                 "lambda:CreateFunction",
                 "lambda:GetFunction",
                 "lambda:GetFunctionConfiguration",
+                "lambda:GetFunctionCodeSigningConfig",
                 "lambda:UpdateFunctionCode",
                 "lambda:UpdateFunctionConfiguration",
                 "lambda:DeleteFunction",
