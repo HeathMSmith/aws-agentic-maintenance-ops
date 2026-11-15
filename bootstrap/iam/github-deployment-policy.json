@@ -67,6 +67,7 @@
                 "iam:ListRoleTags",
                 "iam:ListRolePolicies",
                 "iam:ListAttachedRolePolicies",
+                "iam:ListInstanceProfilesForRole",
                 "iam:PutRolePolicy",
                 "iam:GetRolePolicy",
                 "iam:DeleteRolePolicy"
@@ -108,7 +109,10 @@
                 "logs:TagLogGroup",
                 "logs:UntagResource"
             ],
-            "Resource": "arn:aws:logs:us-east-1:291634988692:log-group:/aws/lambda/agentic-maintenance-ops"
+            "Resource": [
+                "arn:aws:logs:us-east-1:291634988692:log-group:/aws/lambda/agentic-maintenance-ops",
+                "arn:aws:logs:us-east-1:291634988692:log-group:/aws/lambda/agentic-maintenance-ops:*"
+            ]
         },
         {
             "Sid": "DescribeCloudWatchLogGroups",
