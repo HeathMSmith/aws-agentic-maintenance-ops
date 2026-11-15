@@ -26,6 +26,7 @@ htmlcov/
 *.tfstate
 *.tfstate.*
 *.tfplan
+tfplan
 crash.log
 crash.*.log
 *.tfvars
@@ -36,3 +37,6 @@ crash.*.log
 # Local simulation output
 output/
 logs/
+
+# Generated deployment artifacts
+/build/

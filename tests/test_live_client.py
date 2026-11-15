@@ -1,8 +1,11 @@
 """Tests for the live Bedrock Runtime client factory."""
 
 from unittest.mock import MagicMock, patch
-
 from agent.bedrock.live_client import create_live_bedrock_client
+from agent.bedrock.live_client import (
+    create_bedrock_runtime_client,
+    create_live_bedrock_client,
+)
 
 
 def test_create_live_bedrock_client():
@@ -53,5 +56,25 @@ def test_create_live_bedrock_client():
     )
 
     assumed_session.client.assert_called_once_with("bedrock-runtime")
+
+    assert result is bedrock_client
+
+def test_create_bedrock_runtime_client():
+    """Create a Bedrock client using the default AWS credential chain."""
+
+    bedrock_client = MagicMock()
+
+    with patch(
+        "agent.bedrock.live_client.boto3.client",
+        return_value=bedrock_client,
+    ) as mock_client:
+        result = create_bedrock_runtime_client(
+            region_name="us-east-1",
+        )
+
+    mock_client.assert_called_once_with(
+        "bedrock-runtime",
+        region_name="us-east-1",
+    )
 
     assert result is bedrock_client

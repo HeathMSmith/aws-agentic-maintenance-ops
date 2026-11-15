@@ -35,3 +35,12 @@ def create_live_bedrock_client(
     )
 
     return assumed_session.client("bedrock-runtime")
+
+
+def create_bedrock_runtime_client(region_name: str = DEFAULT_REGION):
+    """Create a Bedrock client using the runtime's AWS credentials."""
+
+    return boto3.client(
+        "bedrock-runtime",
+        region_name=region_name,
+    )

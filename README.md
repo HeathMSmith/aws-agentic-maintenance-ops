@@ -1,11 +1,17 @@
 
 # AWS Agentic Maintenance Operations
 
-A local-first simulation of an agentic AI workflow for investigating industrial equipment alerts, gathering maintenance evidence, and evaluating proposed actions against deterministic operational policies.
+
+A simulation of an agentic AI workflow for investigating industrial equipment alerts, gathering maintenance evidence, and evaluating proposed actions against deterministic operational policies.
 
 The project explores how Amazon Bedrock's Converse API and tool-use capabilities can support maintenance investigations without giving a language model direct authority to approve operational actions.
 
-The current implementation runs locally using scripted Bedrock responses and simulated maintenance data. No AWS resources are required to run the offline demonstration.
+The workflow can run locally using scripted Bedrock responses or in AWS using a Python 3.13 Lambda function that invokes Claude Haiku 4.5 through Amazon Bedrock. Terraform manages the Lambda function, its IAM permissions, and CloudWatch logging.
+
+Both execution environments use simulated maintenance data. No real equipment is controlled, and proposed maintenance actions are not executed automatically.
+
+The offline demonstration does not require AWS resources or incur Bedrock inference charges.
+
 
 ## Problem Statement
 
@@ -97,6 +103,117 @@ python -m pytest -q
 
 The tests cover local tools, evidence validation, Bedrock conversation handling, investigation workflow behavior, action proposals, and policy enforcement.
 
+
+## AWS Deployment
+
+The investigation workflow also runs as an AWS Lambda function using Amazon Bedrock for live model inference. Terraform manages the Lambda function, its execution role, Bedrock permissions, and CloudWatch logging.
+
+The deployed environment uses the same simulated maintenance datasets as the offline demonstration. It does not connect to industrial control systems or execute maintenance actions.
+
+### Infrastructure
+
+The Terraform configuration in `terraform/` creates:
+
+- A Python 3.13 Lambda function named `agentic-maintenance-ops`.
+- A dedicated Lambda execution role with scoped CloudWatch Logs and Bedrock permissions.
+- A CloudWatch log group with seven-day retention.
+
+The Lambda function runs outside a customer-managed VPC. It invokes Claude Haiku 4.5 through the global Bedrock inference profile `global.anthropic.claude-haiku-4-5-20251001-v1:0`.
+
+Terraform state is stored in an existing S3 bucket using a dedicated state key and native S3 locking. The state bucket is managed separately from this repository.
+
+### Build the Lambda Package
+
+From the repository root:
+
+```bash
+bash scripts/build_lambda.sh
+```
+
+The script installs Python 3.13-compatible Linux x86_64 dependencies, copies the application code and simulation datasets, removes Python cache files, and creates:
+
+```text
+build/lambda/aws-agentic-maintenance-lambda.zip
+```
+
+The generated ZIP is excluded from Git. File timestamps are normalized to make repeated builds reproducible within the same build environment.
+
+### Deploy with Terraform
+
+The deployment requires AWS credentials with permission to manage Lambda, IAM, CloudWatch Logs, and the configured S3 Terraform backend.
+
+Initialize Terraform:
+
+```bash
+AWS_PROFILE=portfolio terraform -chdir=terraform init
+```
+
+Build the Lambda package before planning or applying infrastructure changes.
+
+Set the artifact path:
+
+```bash
+export TF_VAR_lambda_zip_path="$(pwd)/build/lambda/aws-agentic-maintenance-lambda.zip"
+```
+
+Review the planned changes:
+
+```bash
+AWS_PROFILE=portfolio terraform -chdir=terraform plan
+```
+
+Apply the configuration after reviewing the plan:
+
+```bash
+AWS_PROFILE=portfolio terraform -chdir=terraform apply
+```
+
+The `portfolio` profile is used for this project's deployment environment. Other environments can use their own AWS credential configuration.
+
+Amazon Bedrock inference and AWS infrastructure usage may incur charges.
+
+### Invoke the Investigation
+
+Invoke the deployed Lambda function using the simulated alert:
+
+```bash
+AWS_PROFILE=portfolio aws lambda invoke \
+  --function-name agentic-maintenance-ops \
+  --region us-east-1 \
+  --cli-binary-format raw-in-base64-out \
+  --payload '{
+    "alert_id": "ALERT-0001",
+    "reference_timestamp": "2026-11-10T18:00:00Z"
+  }' \
+  --cli-read-timeout 180 \
+  /tmp/agentic-maintenance-response.json
+```
+
+Inspect the response:
+
+```bash
+python -m json.tool /tmp/agentic-maintenance-response.json
+```
+
+A successful investigation returns an `evaluated` status, maintenance-window assessment, authorization assessment, and proposed action.
+
+The model-generated proposal is marked `model_generated_unverified`. The authorization assessment is produced through deterministic policy evaluation rather than accepting the model's narrative as operational authority.
+
+### Validate the Deployment
+
+The AWS deployment was verified through:
+
+- A successful Terraform deployment and subsequent no-change plan.
+- An AWS Lambda configuration and deployment artifact hash check.
+- A controlled invalid-input invocation.
+- A live Bedrock investigation of `ALERT-0001`.
+- CloudWatch execution logs and Lambda resource metrics.
+
+The live investigation completed successfully and returned a permitted expert-review request. This validates the tested workflow, not every possible maintenance scenario.
+
+The initial deployment uses 512 MB of Lambda memory and a 120-second timeout. These are starting settings rather than performance-tested production requirements.
+
+
 ## Evidence Auditability and Integrity
 
 Successful evidence-tool executions produce structured evidence records containing:
@@ -121,28 +238,35 @@ Evidence records are currently returned in memory. The project does not implemen
 
 These would require additional design work before the system could be considered suitable for production maintenance operations.
 
+
 ## Current Scope
 
 The repository currently implements:
 
-- Simulated industrial equipment and maintenance datasets.
-- Local maintenance evidence retrieval tools.
-- Structured evidence validation.
-- Bedrock Converse-style tool orchestration.
+- Simulated industrial equipment alerts, asset records, maintenance history, and production schedules.
+- Maintenance evidence retrieval through defined tools.
+- Structured evidence validation and SHA-256 integrity checking.
+- Bedrock Converse API tool orchestration.
 - A scripted offline investigation demonstration.
+- Live investigation execution using AWS Lambda and Amazon Bedrock.
 - Structured maintenance-action proposals.
-- Deterministic policy evaluation.
-- Evidence capture and SHA-256 integrity checking.
+- Deterministic policy evaluation that remains separate from model-generated recommendations.
+- Consumer-facing responses that distinguish proposed actions from authorization decisions.
+- Terraform-managed Lambda infrastructure, IAM permissions, and CloudWatch logging.
+- Reproducible Lambda packaging through a local build script.
 - Automated regression tests.
+
+The AWS deployment has been validated using a simulated equipment alert and live Bedrock inference. The implementation does not connect to real industrial equipment, execute maintenance actions, or provide a production maintenance-management service.
 
 ## Future Development
 
 Potential next steps include:
 
-- Running investigations against an actual Amazon Bedrock model.
-- Provisioning the required AWS infrastructure with Terraform.
-- Persisting investigation records in durable storage.
+- Persisting investigation results and evidence records in durable storage.
 - Adding authenticated evidence provenance and protected audit records.
-- Implementing appropriate IAM boundaries, monitoring, and operational safeguards.
+- Introducing structured application logging and operational metrics for investigation outcomes.
+- Expanding integration tests to cover additional live Bedrock responses and failure scenarios.
+- Adding CI/CD automation for testing, packaging, and Terraform deployment.
+- Evaluating Lambda memory allocation, execution duration, and Bedrock inference costs using additional measurements.
 
-The current focus is on understanding and validating the agentic workflow locally before introducing deployment complexity and AWS costs.
+The next development priorities are improving operational visibility, deployment automation, and evidence persistence while preserving the separation between model-generated proposals and deterministic authorization.
