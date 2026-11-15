@@ -1,0 +1,49 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "AllowInferenceProfileInvocation",
+            "Effect": "Allow",
+            "Action": "bedrock:InvokeModel",
+            "Resource": "arn:aws:bedrock:us-east-1:291634988692:inference-profile/global.anthropic.claude-haiku-4-5-20251001-v1:0",
+            "Condition": {
+                "StringEquals": {
+                    "aws:RequestedRegion": "us-east-1"
+                }
+            }
+        },
+        {
+            "Sid": "AllowRegionalModelViaInferenceProfile",
+            "Effect": "Allow",
+            "Action": "bedrock:InvokeModel",
+            "Resource": "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
+            "Condition": {
+                "StringEquals": {
+                    "aws:RequestedRegion": "us-east-1",
+                    "bedrock:InferenceProfileArn": "arn:aws:bedrock:us-east-1:291634988692:inference-profile/global.anthropic.claude-haiku-4-5-20251001-v1:0"
+                }
+            }
+        },
+        {
+            "Sid": "AllowGlobalModelViaInferenceProfile",
+            "Effect": "Allow",
+            "Action": "bedrock:InvokeModel",
+            "Resource": "arn:aws:bedrock:::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
+            "Condition": {
+                "StringEquals": {
+                    "aws:RequestedRegion": "unspecified",
+                    "bedrock:InferenceProfileArn": "arn:aws:bedrock:us-east-1:291634988692:inference-profile/global.anthropic.claude-haiku-4-5-20251001-v1:0"
+                }
+            }
+        },
+        {
+            "Sid": "AllowLambdaLogging",
+            "Effect": "Allow",
+            "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+            ],
+            "Resource": "arn:aws:logs:us-east-1:291634988692:log-group:/aws/lambda/agentic-maintenance-ops:*"
+        }
+    ]
+}

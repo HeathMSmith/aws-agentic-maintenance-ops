@@ -1,0 +1,41 @@
+name: AWS OIDC Authentication Test
+
+on:
+    workflow_dispatch:
+
+permissions:
+    id-token: write
+    contents: read
+
+jobs:
+    authenticate:
+        name: Verify AWS OIDC Authentication
+        runs-on: ubuntu-latest
+        environment: dev
+
+        steps:
+            - name: Configure AWS credentials
+              uses: aws-actions/configure-aws-credentials@v5
+              with:
+                  role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+                  aws-region: ${{ vars.AWS_REGION }}
+
+            - name: Verify AWS identity
+              run: |
+                  ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+                  ROLE_ARN="$(aws sts get-caller-identity --query Arn --output text)"
+
+                  echo "AWS Account: ${ACCOUNT_ID}"
+                  echo "Assumed Role: ${ROLE_ARN}"
+
+                  if [[ "${ACCOUNT_ID}" != "291634988692" ]]; then
+                    echo "ERROR: Unexpected AWS account."
+                    exit 1
+                  fi
+
+                  if [[ "${ROLE_ARN}" != *":assumed-role/agentic-maintenance-ops-github-deploy-role/"* ]]; then
+                    echo "ERROR: Unexpected IAM role."
+                    exit 1
+                  fi
+
+                  echo "AWS OIDC authentication verified."
