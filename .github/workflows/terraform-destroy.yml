@@ -37,7 +37,6 @@ jobs:
             echo "::error::Confirmation must be exactly DESTROY."
             exit 1
           fi
-        
       - name: Checkout repository
         uses: actions/checkout@v7
 
