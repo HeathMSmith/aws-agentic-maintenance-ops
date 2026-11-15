@@ -17,6 +17,8 @@ resource "aws_iam_role" "lambda_execution" {
 
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
 
+  permissions_boundary = "arn:aws:iam::291634988692:policy/agentic-maintenance-ops-lambda-boundary"
+
   tags = {
     Project   = "aws-agentic-maintenance-ops"
     ManagedBy = "Terraform"
