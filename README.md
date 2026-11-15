@@ -136,7 +136,46 @@ The script installs Python 3.13-compatible Linux x86_64 dependencies, copies the
 build/lambda/aws-agentic-maintenance-lambda.zip
 ```
 
-The generated ZIP is excluded from Git. File timestamps are normalized to make repeated builds reproducible within the same build environment.
+The generated ZIP is excluded from Git. The build script normalizes file timestamps, removes environment-specific pip installation artifacts, and sorts ZIP entries before packaging. These steps prevent differences in filesystem traversal order and installed Python interpreter paths from changing the deployment artifact.
+
+Reproducibility was verified by comparing SHA-256 hashes from repeated macOS builds and a GitHub Actions Linux build. All three produced identical ZIP files for the tested source revision.
+
+### GitHub Actions CI/CD
+
+GitHub Actions handles application testing, Lambda packaging, Terraform validation, and infrastructure deployment. The workflows are defined in `.github/workflows/`.
+
+| Workflow | Purpose |
+|---|---|
+| `ci.yml` | Runs application tests, builds the Lambda package, and validates Terraform configuration. |
+| `aws-oidc-test.yml` | Verifies that GitHub Actions can authenticate to the AWS deployment account through OIDC. |
+| `terraform-plan.yml` | Manually generates a Terraform plan for reviewing infrastructure changes. |
+| `terraform-apply.yml` | Manually generates and applies a saved Terraform plan. |
+| `terraform-destroy.yml` | Manually removes the Terraform-managed application infrastructure after explicit confirmation. |
+
+#### AWS Authentication and Bootstrap Resources
+
+Deployment workflows authenticate to AWS using GitHub Actions OIDC and a dedicated IAM role, `agentic-maintenance-ops-github-deploy-role`. No long-lived AWS access keys are stored in GitHub for these workflows.
+
+The role's deployment permissions are scoped to this project's Lambda function, execution role, CloudWatch log group, and Terraform state objects. The policy definition is maintained in `bootstrap/iam/github-deployment-policy.json`.
+
+The GitHub deployment role, its attached IAM policy, and the Lambda execution role's permissions-boundary policy are bootstrapped outside this Terraform configuration. They are not created or destroyed by the application workflows.
+
+The workflows use the GitHub `dev` environment, which restricts deployment to `main`. Terraform Plan, Apply, and Destroy also share a concurrency group to prevent overlapping infrastructure operations.
+
+#### Terraform Deployment and Teardown
+
+Terraform uses the existing S3 state bucket `hms-terraform-state-portfolio`, with a state key dedicated to this project and native S3 state locking.
+
+Plan and Apply build the Lambda ZIP before evaluating Terraform configuration. Apply generates a saved plan and applies that exact plan within the same workflow run.
+
+Destroy follows the same approach using a saved destroy plan. It requires manual execution from `main` and the exact confirmation phrase `DESTROY`. Invalid confirmation or branch selection causes the job to fail before AWS credentials are configured.
+
+The confirmation phrase is a guard against accidental execution, not an independent approval mechanism. The `dev` environment currently does not require reviewer approval.
+
+Destroy removes the five Terraform-managed application resources: the Lambda function, its execution role, two inline IAM policies, and the CloudWatch log group. It does not delete the externally managed deployment role, permissions boundary, or shared S3 state bucket.
+
+The workflow intentionally retains the Lambda packaging step for consistency with the other Terraform workflows, even though generating an application ZIP is not inherently necessary for deleting infrastructure.
+
 
 ### Deploy with Terraform
 
@@ -201,17 +240,22 @@ The model-generated proposal is marked `model_generated_unverified`. The authori
 
 ### Validate the Deployment
 
-The AWS deployment was verified through:
+The AWS deployment and infrastructure lifecycle were verified through:
 
-- A successful Terraform deployment and subsequent no-change plan.
-- An AWS Lambda configuration and deployment artifact hash check.
-- A controlled invalid-input invocation.
-- A live Bedrock investigation of `ALERT-0001`.
-- CloudWatch execution logs and Lambda resource metrics.
+- Successful initial Terraform provisioning of five managed AWS resources.
+- An in-place Lambda code update through GitHub Actions.
+- Matching SHA-256 hashes between the deployed Lambda package and the locally built artifact.
+- A controlled invalid-input invocation that returned `invalid_invocation_input`.
+- A live Bedrock investigation of `ALERT-0001` that returned `evaluated`.
+- Successful Terraform Destroy execution, removing all five managed resources.
+- Verification that Terraform state contained no resources after teardown.
+- Confirmation that the shared S3 state bucket, GitHub deployment role, and Lambda permissions-boundary policy remained intact.
 
-The live investigation completed successfully and returned a permitted expert-review request. This validates the tested workflow, not every possible maintenance scenario.
+The live investigation returned a permitted `request_expert_review` recommendation after evaluating maintenance-window availability and deterministic authorization policy. This validates the tested workflow, not every possible maintenance scenario.
 
-The initial deployment uses 512 MB of Lambda memory and a 120-second timeout. These are starting settings rather than performance-tested production requirements.
+The application infrastructure was destroyed after lifecycle testing and is not currently deployed. It can be recreated using the Terraform Apply workflow.
+
+The tested Lambda configuration used 512 MB of memory and a 120-second timeout. These are starting settings rather than performance-tested production requirements.
 
 
 ## Evidence Auditability and Integrity
@@ -254,6 +298,10 @@ The repository currently implements:
 - Consumer-facing responses that distinguish proposed actions from authorization decisions.
 - Terraform-managed Lambda infrastructure, IAM permissions, and CloudWatch logging.
 - Reproducible Lambda packaging through a local build script.
+- GitHub Actions CI/CD for application testing, Lambda packaging, and Terraform validation.
+- AWS deployment authentication through GitHub Actions OIDC and a dedicated IAM role.
+- Manual Terraform Plan, Apply, and Destroy workflows using remote S3 state and native locking.
+- Verified infrastructure provisioning, Lambda updates, and teardown while preserving externally managed bootstrap resources.
 - Automated regression tests.
 
 The AWS deployment has been validated using a simulated equipment alert and live Bedrock inference. The implementation does not connect to real industrial equipment, execute maintenance actions, or provide a production maintenance-management service.
@@ -266,7 +314,6 @@ Potential next steps include:
 - Adding authenticated evidence provenance and protected audit records.
 - Introducing structured application logging and operational metrics for investigation outcomes.
 - Expanding integration tests to cover additional live Bedrock responses and failure scenarios.
-- Adding CI/CD automation for testing, packaging, and Terraform deployment.
 - Evaluating Lambda memory allocation, execution duration, and Bedrock inference costs using additional measurements.
 
-The next development priorities are improving operational visibility, deployment automation, and evidence persistence while preserving the separation between model-generated proposals and deterministic authorization.
+The next development priorities are improving operational visibility, expanding live integration testing, and introducing durable evidence storage. The existing GitHub Actions workflows provide a foundation for deploying and testing those changes while preserving the separation between model-generated proposals and deterministic authorization.
