@@ -51,7 +51,7 @@ rm -f "$ZIP_FILE"
 
 (
   cd "$STAGING_DIR"
-  zip -q -r -X "$ZIP_FILE" .
+  find . -type f | LC_ALL=C sort | zip -q -X "$ZIP_FILE" -@
 )
 
 echo "Verifying ZIP integrity..."
