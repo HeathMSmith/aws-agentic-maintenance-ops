@@ -1,6 +1,8 @@
 
 # AWS Agentic Maintenance Operations
 
+[![CI](https://github.com/HeathMSmith/aws-agentic-maintenance-ops/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/HeathMSmith/aws-agentic-maintenance-ops/actions/workflows/ci.yml)
+
 
 A simulation of an agentic AI workflow for investigating industrial equipment alerts, gathering maintenance evidence, and evaluating proposed actions against deterministic operational policies.
 
@@ -309,14 +311,29 @@ The repository currently implements:
 
 The AWS deployment has been validated using a simulated equipment alert and live Bedrock inference. The implementation does not connect to real industrial equipment, execute maintenance actions, or provide a production maintenance-management service.
 
+
 ## Future Development
 
-Potential next steps include:
+The next development phase focuses on expanding the simulated investigation scenarios and making the workflow easier to explore through an interactive interface.
 
-- Persisting investigation results and evidence records in durable storage.
-- Adding authenticated evidence provenance and protected audit records.
-- Introducing structured application logging and operational metrics for investigation outcomes.
-- Expanding integration tests to cover additional live Bedrock responses and failure scenarios.
-- Evaluating Lambda memory allocation, execution duration, and Bedrock inference costs using additional measurements.
+### Planned Next Steps
 
-The next development priorities are improving operational visibility, expanding live integration testing, and introducing durable evidence storage. The existing GitHub Actions workflows provide a foundation for deploying and testing those changes while preserving the separation between model-generated proposals and deterministic authorization.
+- **Expand the simulated equipment dataset.** Increase the current dataset from one equipment alert to eight distinct scenarios involving equipment degradation, recurring failures, maintenance opportunities, critical assets, and incomplete evidence. Each scenario will use consistent asset, maintenance history, and production schedule records.
+
+- **Build an interactive operations dashboard.** Develop a local, offline-first interface for selecting equipment alerts, running investigations, examining retrieved evidence, and reviewing maintenance proposals alongside independent authorization assessments.
+
+- **Add optional live AWS investigations.** Explore controlled integration with the existing Lambda and Bedrock workflow. Live inference will remain optional to avoid unnecessary AWS costs and prevent unrestricted access to model invocation.
+
+### Longer-Term Improvements
+
+- Persist investigation results and evidence records in durable storage.
+
+- Add authenticated evidence provenance and protected audit records.
+
+- Introduce structured application logging and operational metrics for investigation outcomes.
+
+- Expand integration tests to cover additional live Bedrock responses and failure scenarios.
+
+- Evaluate Lambda memory allocation, execution duration, and Bedrock inference costs using additional measurements.
+
+The project will continue to separate model-generated maintenance proposals from deterministic authorization decisions. The simulated workflow does not execute physical maintenance actions.
