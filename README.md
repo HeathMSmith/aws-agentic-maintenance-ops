@@ -55,6 +55,42 @@ For example, the model may suggest an immediate equipment shutdown, but the dete
 
 Incomplete investigations are rejected before action-proposal generation or policy evaluation.
 
+
+## Example Investigation Result
+
+The following response was returned by a live AWS Lambda investigation using Amazon Bedrock and Claude Haiku 4.5 on November 15, 2026.
+
+The investigation evaluated `ALERT-0001`, an elevated vibration and temperature anomaly affecting a packaging conveyor motor, using the reference timestamp `2026-11-15T15:00:00Z`.
+
+```json
+{
+  "status": "evaluated",
+  "alert_id": "ALERT-0001",
+  "decision_summary": {
+    "maintenance_window_assessment": {
+      "available": false,
+      "reference_timestamp": "2026-11-15T15:00:00Z",
+      "summary": "No active or upcoming maintenance window was found in the recorded production schedule at the investigation reference time."
+    },
+    "authorization_assessment": {
+      "action": "request_expert_review",
+      "decision": "permitted",
+      "summary": "The proposed expert review request is permitted under the simulation policy."
+    }
+  },
+  "proposal": {
+    "action": "request_expert_review",
+    "provenance": "model_generated_unverified"
+  }
+}
+```
+
+The model proposed requesting expert review. The deterministic policy evaluator independently determined that this action was permitted under the simulation's operational policies.
+
+The `permitted` decision applies only to the expert-review request. It does not authorize equipment shutdown, physical maintenance, or any other operational action.
+
+This is a recorded result from one successful live investigation. Subsequent Bedrock invocations may produce different proposals, and those proposals remain subject to the same evidence-validation and authorization controls.
+
 ## Running the Offline Demonstration
 
 The offline demonstration executes the investigation workflow using a scripted Bedrock-compatible client. It does not make AWS API calls.
