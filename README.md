@@ -23,6 +23,9 @@ Rather than relying on a model's response alone, the workflow retrieves structur
 
 ## Architecture
 
+![AWS Agentic Maintenance Operations Architecture](docs/architecture/agentic-maintenance-architecture.png)
+
+
 The workflow separates evidence collection, action proposal generation, and policy evaluation.
 
 1. An equipment alert initiates an investigation.
